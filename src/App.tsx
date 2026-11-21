@@ -1,3 +1,9 @@
+import CommandScreen, {
+  FormationPanel,
+  initialFormation,
+} from "./CommandScreen";
+import { createCommand } from "./command";
+import { readCommandCareer } from "./storage";
 import { regionFor } from "./regions";
 import { useEffect, useRef, useState } from "react";
 import MountainMap from "./Map";
@@ -122,8 +128,17 @@ function Landscape() {
 }
 export default function App() {
   const [screen, setScreen] = useState<
-    "menu" | "missions" | "briefing" | "game" | "records" | "help" | "settings"
+    | "menu"
+    | "missions"
+    | "briefing"
+    | "game"
+    | "records"
+    | "help"
+    | "settings"
+    | "command"
   >("menu");
+  const [formation, setFormation] = useState(initialFormation);
+  const [command, setCommand] = useState(() => createCommand());
   const [mission, setMission] = useState<MissionId>(1);
   const [loadout, setLoadout] = useState<Equipment[]>([
     "kit",
@@ -221,6 +236,20 @@ export default function App() {
     }
   }
   function start() {
+    if (mission === 6) {
+      setCommand(
+        createCommand(
+          seedInput.trim() ? Number(seedInput) >>> 0 : Date.now(),
+          formation,
+          readCareer().skills,
+          practice,
+          readCommandCareer().xp,
+        ),
+      );
+      setScreen("command");
+      beep();
+      return;
+    }
     clearTimeout(timer.current);
     lock.current = false;
     setBusy(false);
@@ -298,6 +327,16 @@ export default function App() {
       </button>
     );
   };
+  if (screen === "command")
+    return (
+      <CommandScreen
+        key={command.runId}
+        initial={command}
+        settings={settings}
+        onExit={() => setScreen("missions")}
+        onBeep={beep}
+      />
+    );
   return (
     <div className={`app ${screen === "game" ? "in-game" : "in-menu"}`}>
       <header className="brandbar">
@@ -370,7 +409,7 @@ export default function App() {
           </div>
           <footer className="menu-footer">
             <span>산을 읽고. 흔적을 따라. 함께 돌아오다.</span>
-            <span>산악 구조 작전 · 03</span>
+            <span>구조대 지휘 작전 · 04</span>
           </footer>
         </main>
       )}
@@ -441,13 +480,22 @@ export default function App() {
               </button>
             </section>
           </div>
-          <Loadout
-            loadout={loadout}
-            setLoadout={setLoadout}
-            mission={mission}
-            seed={seedInput}
-            setSeed={setSeedInput}
-          />
+          {mission === 6 ? (
+            <FormationPanel
+              formation={formation}
+              setFormation={setFormation}
+              seed={seedInput}
+              setSeed={setSeedInput}
+            />
+          ) : (
+            <Loadout
+              loadout={loadout}
+              setLoadout={setLoadout}
+              mission={mission}
+              seed={seedInput}
+              setSeed={setSeedInput}
+            />
+          )}
           <button className="primary wide" onClick={start}>
             장비 확인 · 구조대 출동
           </button>
@@ -878,6 +926,14 @@ export default function App() {
                     <p>
                       성공 {stats.wins}회 · 최고 평가 {stats.bestStars}별
                     </p>
+                    {id === 6 && (
+                      <p>
+                        최고 {readCommandCareer().bestGrade ?? "—"}등급 · 누적
+                        구조 {readCommandCareer().rescued}명 · 드론{" "}
+                        {readCommandCareer().droneUses}회 · 헬기{" "}
+                        {readCommandCareer().heliUses}회
+                      </p>
+                    )}
                     <p>
                       최단 구조 {stats.bestTime ?? "—"}분 · 최고 생존 상태{" "}
                       {stats.bestHealth}
@@ -900,7 +956,11 @@ export default function App() {
                     </div>
                     <span>{r.time}분</span>
                     <span>생존 상태 {r.health}</span>
-                    <span className="orange">{"★".repeat(r.stars)}</span>
+                    <span className="orange">
+                      {r.grade
+                        ? `${r.grade}등급 · ${r.rescued}명 구조`
+                        : "★".repeat(r.stars)}
+                    </span>
                   </article>
                 ))
               ) : (

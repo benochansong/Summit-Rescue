@@ -1932,3 +1932,547 @@ input[type="checkbox"] {
     padding: 22px;
   }
 }
+/* Rescue Command */
+.formation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+.formation-grid article {
+  border-top: 2px solid;
+  padding: 20px;
+  background: #142c2c;
+  border-radius: 3px;
+}
+.formation-grid h2 {
+  font-size: 25px;
+  margin: 12px 0;
+}
+.formation-grid p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #b3c3ba;
+}
+.formation-items {
+  display: grid;
+  gap: 9px;
+  margin-top: 20px;
+}
+.formation-items label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+}
+.formation-items small {
+  margin-left: auto;
+}
+.formation input[type="checkbox"],
+.crew-card input {
+  accent-color: #e9b678;
+  width: 17px;
+  height: 17px;
+}
+.command-seed {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.command-seed input {
+  padding: 10px;
+  background: #11282c;
+  color: #ecede5;
+  border: 1px solid #506866;
+}
+.command-shell {
+  background: #10252a;
+  color: #d5dfd6;
+  min-height: 100dvh;
+  padding: 0 20px 20px;
+  font-size: 13px;
+}
+.command-top {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding: 20px 4px;
+  border-bottom: 1px solid #3c5353;
+}
+.command-top > div:first-child {
+  flex: 1;
+}
+.command-top h1 {
+  font-size: 26px;
+  margin: 8px 0 0;
+  letter-spacing: -1px;
+}
+.command-top h1 small {
+  font-size: 12px;
+  letter-spacing: 0;
+  margin-left: 12px;
+  color: #dbb57e;
+}
+.command-top > div > span:not(.eyebrow) {
+  display: block;
+  font-size: 11px;
+  margin-top: 5px;
+  color: #9fb3b0;
+}
+.command-clock strong {
+  font-size: 29px;
+  font-variant-numeric: tabular-nums;
+}
+.command-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 280px;
+  gap: 12px;
+  margin: 14px 0;
+}
+.command-layout .panel {
+  padding: 15px;
+  background: #172e32;
+  border: 1px solid #344a4d;
+  border-radius: 5px;
+}
+.command-shell summary {
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 13px;
+  line-height: 1.7;
+  list-style-position: inside;
+}
+.command-shell details[open] > summary {
+  margin-bottom: 12px;
+}
+.command-roster > summary {
+  font-size: 12px;
+}
+.crew-cards {
+  display: grid;
+  gap: 12px;
+}
+.crew-card {
+  border: 1px solid #3a4e50;
+  border-left: 3px solid;
+  padding: 12px;
+  background: #183237;
+  border-radius: 5px;
+}
+.crew-card.selected {
+  background: #294145;
+  border-top-color: #aabbad;
+  border-right-color: #aabbad;
+  border-bottom-color: #aabbad;
+}
+.crew-card label {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+  gap: 4px 8px;
+  cursor: pointer;
+}
+.crew-card label small {
+  grid-column: 2;
+  color: #a8bbb3;
+  font-size: 10px;
+}
+.crew-card b {
+  font-size: 15px;
+}
+.crew-card p {
+  margin: 7px 0;
+}
+.crew-card > small {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #b5c7c0;
+}
+.crew-card details {
+  margin-top: 8px;
+}
+.crew-card details summary {
+  font-size: 11px;
+  color: #b3c3bb;
+}
+.crew-card details p {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.crew-focus {
+  font-size: 11px !important;
+  padding: 8px 0 !important;
+}
+.crew-stamina {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 11px;
+}
+.crew-stamina meter {
+  flex: 1;
+  width: 60px;
+}
+.command-shell meter {
+  height: 7px;
+  accent-color: #a1cbb0;
+}
+.command-roster > .muted {
+  font-size: 11px;
+  line-height: 1.8;
+  margin-bottom: 0;
+}
+.command-map {
+  position: relative;
+  min-width: 0;
+  min-height: 520px;
+  border: 1px solid #465b54;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.command-map .map-wrap {
+  height: 100%;
+  min-height: 520px;
+}
+.command-map svg {
+  min-height: 520px;
+  width: 100%;
+  height: 100%;
+}
+.command-map-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 64px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  pointer-events: none;
+  color: #e0e6d7;
+  font-size: 10px;
+  text-shadow: 0 1px 4px #10252a;
+}
+.crew-map-marker {
+  transition: transform 0.6s ease;
+}
+.command-overlays .air-marker circle {
+  animation: pulse 2s ease-in-out infinite;
+}
+.command-intel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.subject-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #132b30;
+  border: 1px solid #3b5556;
+  color: #c8d8ce;
+  margin-bottom: 10px;
+  padding: 11px;
+  border-radius: 4px;
+}
+.subject-card.selected {
+  border-color: #d6aa73;
+}
+.subject-card strong {
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+}
+.subject-card strong span {
+  font-size: 10px;
+  color: #e5ba83;
+}
+.subject-card small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.8;
+  margin-top: 5px;
+}
+.subject-card meter {
+  width: 100%;
+  margin-top: 8px;
+}
+.command-intel > details > small {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #b3c7be;
+}
+.air-support > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.air-support span,
+.air-support p,
+.air-support small {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #a9beb6;
+}
+.air-support meter {
+  width: 100%;
+  margin: 8px 0;
+}
+.command-radio {
+  max-height: 190px;
+  overflow: auto;
+}
+.command-radio p {
+  font-size: 11px;
+  line-height: 1.8;
+  border-bottom: 1px solid #344a4b;
+  padding-bottom: 10px;
+  margin: 0 0 10px;
+}
+.command-radio .urgent {
+  color: #ffc58c;
+  border-left: 2px solid #d59557;
+  padding-left: 8px;
+}
+.command-controls {
+  background: #172e32;
+  border: 1px solid #40585a;
+  border-radius: 5px;
+  padding: 15px;
+}
+.command-pick {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.command-pick label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11px;
+}
+.command-shell select {
+  background: #10272d;
+  color: #dce4da;
+  padding: 10px;
+  border: 1px solid #4a6666;
+  border-radius: 4px;
+  min-width: 140px;
+  font: inherit;
+}
+.command-pick > p {
+  flex: 1;
+  min-width: 190px;
+  line-height: 1.6;
+  font-size: 11px;
+  margin: 0;
+}
+.command-shell button {
+  border-radius: 4px;
+}
+.order-queue {
+  display: flex;
+  gap: 10px;
+  margin: 14px 0;
+  flex-wrap: wrap;
+}
+.order-queue > div {
+  flex: 1;
+  min-width: 180px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  padding: 10px;
+  background: #10282e;
+  border-left: 2px solid #9dbdb2;
+}
+.order-queue span {
+  font-size: 11px;
+  grid-column: 1;
+}
+.order-queue progress {
+  width: 100%;
+  height: 4px;
+  grid-column: 1;
+  accent-color: #d6b17c;
+}
+.order-queue button {
+  font-size: 11px;
+  grid-column: 2;
+  grid-row: 1 / 4;
+}
+.order-queue > p {
+  margin: 0;
+  font-size: 11px;
+  color: #adc1b6;
+}
+.command-run {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.command-run > span {
+  font-size: 11px;
+  color: #a6bab3;
+  flex: 1;
+}
+.command-controls > p:empty {
+  display: none;
+}
+.recall-confirm {
+  padding: 10px;
+  border: 1px solid #d7ac75;
+  margin-top: 14px;
+}
+.recall-confirm button {
+  margin-right: 10px;
+}
+.command-result {
+  margin-top: 16px;
+}
+.command-result h2 {
+  font-size: 28px;
+}
+.command-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin: 25px 0;
+}
+.command-result button {
+  margin: 16px 10px 0 0;
+}
+.command-result details p {
+  line-height: 1.8;
+}
+@media (min-width: 1200px) and (min-height: 650px) {
+  .command-layout {
+    height: calc(100dvh - 380px);
+    min-height: 320px;
+  }
+  .command-roster,
+  .command-intel {
+    overflow: auto;
+  }
+  .command-map .map-wrap,
+  .command-map svg {
+    min-height: 0;
+  }
+  .command-map {
+    min-height: 0;
+  }
+}
+@media (max-width: 1199px) {
+  .command-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+  }
+  .command-intel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: start;
+  }
+  .command-top {
+    gap: 18px;
+  }
+  .command-top h1 {
+    font-size: 21px;
+  }
+  .command-shell {
+    padding: 0 12px 15px;
+  }
+}
+@media (max-width: 700px) {
+  .formation-grid {
+    grid-template-columns: 1fr;
+  }
+  .command-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .command-map {
+    order: -1;
+    min-height: 440px;
+  }
+  .command-map svg,
+  .command-map .map-wrap {
+    min-height: 440px;
+  }
+  .command-roster .crew-cards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .command-roster.panel {
+    padding: 10px;
+  }
+  .crew-card {
+    padding: 8px;
+  }
+  .crew-card b {
+    font-size: 12px;
+  }
+  .crew-card label {
+    grid-template-columns: 17px 1fr;
+    gap: 3px;
+  }
+  .crew-card label small {
+    grid-column: 1 / -1;
+  }
+  .crew-stamina {
+    display: block;
+  }
+  .crew-stamina meter {
+    width: 100%;
+  }
+  .command-intel {
+    display: flex;
+  }
+  .command-top {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 3px;
+  }
+  .command-top > div:first-child {
+    flex-basis: 100%;
+  }
+  .command-top h1 {
+    font-size: 24px;
+  }
+  .command-top .eyebrow {
+    font-size: 10px;
+  }
+  .command-pick label {
+    flex: 1;
+  }
+  .command-pick select {
+    width: 100%;
+    min-width: 110px;
+  }
+  .command-pick .primary {
+    flex: 1;
+  }
+  .command-result-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .command-run > span {
+    flex-basis: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crew-map-marker {
+    transition: none;
+  }
+  .command-overlays .air-marker circle {
+    animation: none;
+  }
+}
+html[data-motion="off"] .crew-map-marker {
+  transition: none;
+}
+html[data-motion="off"] .command-overlays .air-marker circle {
+  animation: none;
+}
