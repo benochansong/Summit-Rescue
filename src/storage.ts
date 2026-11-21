@@ -1,5 +1,8 @@
+import { missionIds } from "./conditions";
+import { normalizeSkills, train, zeroSkills } from "./progression";
+import type { Career, Skill } from "./progression";
 import type { Game } from "./game";
-import { stars } from "./game";
+import { earnedXp, stars } from "./game";
 export type RecordEntry = {
   id: string;
   mission: number;
@@ -10,6 +13,8 @@ export type RecordEntry = {
   clues: number;
   stars: number;
   date: string;
+  xp?: number;
+  routes?: string[];
 };
 export type MissionStats = {
   completed: boolean;
@@ -19,7 +24,8 @@ export type MissionStats = {
   bestHealth: number;
 };
 type Store = {
-  version: 2;
+  version: 3;
+  career: Career;
   records: RecordEntry[];
   totals: Record<string, MissionStats>;
 };
@@ -38,7 +44,7 @@ function validRecord(r: unknown): r is RecordEntry {
     typeof v.id === "string" &&
     typeof v.success === "boolean" &&
     typeof v.date === "string" &&
-    [1, 2].includes(v.mission) &&
+    missionIds.some((id) => id === v.mission) &&
     [v.time, v.health, v.stamina, v.clues, v.stars].every(
       (n) => Number.isFinite(n) && n >= 0,
     ) &&
@@ -63,6 +69,9 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
   const totals: Record<string, MissionStats> = {
     "1": emptyStats(),
     "2": emptyStats(),
+    "3": emptyStats(),
+    "4": emptyStats(),
+    "5": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -77,8 +86,8 @@ function readStore(): Store {
         : [];
     const records = candidates.filter(validRecord).slice(0, 100);
     const totals = fromRecords(records);
-    if (raw?.version === 2 && raw?.totals)
-      for (const id of [1, 2]) {
+    if ((raw?.version === 2 || raw?.version === 3) && raw?.totals)
+      for (const id of missionIds) {
         const s = raw.totals[id];
         if (
           s &&
@@ -94,9 +103,25 @@ function readStore(): Store {
         )
           totals[id] = s;
       }
-    return { version: 2, records, totals };
+    const legacyXp = Object.values(totals).reduce(
+      (sum, s) => sum + s.wins * 100,
+      0,
+    );
+    const career: Career =
+      raw?.version === 3 && raw?.career
+        ? {
+            xp: Math.max(0, Number.isFinite(raw.career.xp) ? raw.career.xp : 0),
+            skills: normalizeSkills(raw.career.skills),
+          }
+        : { xp: legacyXp, skills: zeroSkills() };
+    return { version: 3, records, totals, career };
   } catch {
-    return { version: 2, records: [], totals: fromRecords([]) };
+    return {
+      version: 3,
+      records: [],
+      totals: fromRecords([]),
+      career: { xp: 0, skills: zeroSkills() },
+    };
   }
 }
 export function readRecords(): RecordEntry[] {
@@ -104,6 +129,7 @@ export function readRecords(): RecordEntry[] {
 }
 export function saveRecord(game: Game, mission = game.mission): boolean {
   if (game.status === "active") return false;
+  if (game.practice) return true;
   try {
     const store = readStore(),
       id = game.runId;
@@ -118,9 +144,12 @@ export function saveRecord(game: Game, mission = game.mission): boolean {
       clues: game.clues.length,
       stars: stars(game),
       date: new Date().toLocaleDateString("ko-KR"),
+      xp: earnedXp(game),
+      routes: game.routeReport,
     };
     store.records = [record, ...store.records].slice(0, 100);
     store.totals[mission] = addWin(store.totals[mission], record);
+    store.career = { ...store.career, xp: store.career.xp + earnedXp(game) };
     localStorage.setItem(KEY, JSON.stringify(store));
     return true;
   } catch {
@@ -133,13 +162,42 @@ export function missionStats(
 ): MissionStats {
   return readStore().totals[mission] ?? emptyStats();
 }
-export type Settings = { sound: boolean; volume: number; motion: boolean };
+export function readCareer(): Career {
+  return readStore().career;
+}
+export function isUnlocked(mission: number): boolean {
+  const totals = readStore().totals;
+  return (
+    mission === 1 ||
+    !!totals[mission]?.completed ||
+    !!totals[mission - 1]?.completed
+  );
+}
+export function trainSkill(skill: Skill): boolean {
+  try {
+    const store = readStore(),
+      next = train(store.career, skill);
+    if (next === store.career) return false;
+    store.career = next;
+    localStorage.setItem(KEY, JSON.stringify(store));
+    return true;
+  } catch {
+    return false;
+  }
+}
+export type Settings = {
+  sound: boolean;
+  volume: number;
+  motion: boolean;
+  skipDialogue?: boolean;
+};
 export function readSettings(): Settings {
   try {
     const s = JSON.parse(
       localStorage.getItem("summit-rescue.settings") || "{}",
     );
     return {
+      ...(s?.skipDialogue ? { skipDialogue: true } : {}),
       sound: s?.sound === true,
       volume:
         typeof s?.volume === "number" && Number.isFinite(s.volume)
