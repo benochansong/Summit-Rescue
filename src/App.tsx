@@ -1,3 +1,16 @@
+import { ExperienceSetup, ExperienceBar } from "./ExperiencePanels";
+import {
+  actionFeedback,
+  difficulties,
+  stories,
+  gameWeather,
+  gameLimit,
+  tension,
+  failureTip,
+  type ExperienceOptions,
+  type Feedback,
+} from "./experience";
+import { RescueAudio } from "./audio";
 import CommandScreen, {
   FormationPanel,
   initialFormation,
@@ -28,6 +41,7 @@ import {
   readCareer,
   readSettings,
   saveRecord,
+  personalHighlights,
   saveSettings,
 } from "./storage";
 import {
@@ -37,7 +51,6 @@ import {
   missionIds,
   missions,
   recommendations,
-  weatherAt,
   weatherInfo,
 } from "./conditions";
 import type { Equipment, MissionId } from "./conditions";
@@ -139,6 +152,12 @@ export default function App() {
   >("menu");
   const [formation, setFormation] = useState(initialFormation);
   const [command, setCommand] = useState(() => createCommand());
+  const [experienceOptions, setExperienceOptions] = useState<ExperienceOptions>(
+    { story: "alone", difficulty: "easy" },
+  );
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [tutorial, setTutorial] = useState(true);
+  const [highlights, setHighlights] = useState<string[]>([]);
   const [mission, setMission] = useState<MissionId>(1);
   const [loadout, setLoadout] = useState<Equipment[]>([
     "kit",
@@ -156,9 +175,10 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [foundOpen, setFoundOpen] = useState(false);
   const [abortOpen, setAbortOpen] = useState(false);
-  const audio = useRef<AudioContext | null>(null);
+  const audio = useRef<RescueAudio | null>(null);
   useEffect(() => {
     saveSettings(settings);
+    audio.current?.configure(settings);
     document.documentElement.dataset.motion = settings.motion ? "on" : "off";
   }, [settings]);
   useEffect(() => {
@@ -179,7 +199,7 @@ export default function App() {
           'button:not(:disabled), [tabindex="0"]',
         ) ?? [],
       );
-    controls()[0]?.focus();
+    controls()[0]?.focus({ preventScroll: true });
     const trap = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
       const list = controls();
@@ -215,25 +235,60 @@ export default function App() {
     },
     [],
   );
-  function beep() {
+  useEffect(() => {
+    audio.current?.scene(
+      gameWeather(game),
+      tension(game).stage,
+      screen === "game" && game.status === "active",
+      foundOpen,
+    );
+  }, [game, screen, foundOpen, settings.sound]);
+  useEffect(() => {
+    const hide = () => {
+      if (document.hidden) audio.current?.suspend();
+    };
+    document.addEventListener("visibilitychange", hide);
+    return () => document.removeEventListener("visibilitychange", hide);
+  }, []);
+  function beep(kind: Feedback["kind"] = "radio") {
     if (!settings.sound) return;
-    try {
-      const ctx = audio.current ?? new AudioContext();
-      audio.current = ctx;
-      void ctx.resume();
-      const o = ctx.createOscillator(),
-        v = ctx.createGain();
-      o.type = "sine";
-      o.frequency.setValueAtTime(660, ctx.currentTime);
-      v.gain.setValueAtTime(settings.volume * 0.1, ctx.currentTime);
-      v.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-      o.connect(v);
-      v.connect(ctx.destination);
-      o.start();
-      o.stop(ctx.currentTime + 0.2);
-    } catch {
-      /* Audio is optional. */
-    }
+    audio.current ??= new RescueAudio();
+    audio.current.configure(settings);
+    audio.current.play(kind);
+  }
+  function quickStart() {
+    clearTimeout(timer.current);
+    lock.current = false;
+    setBusy(false);
+    const options: ExperienceOptions = { story: "alone", difficulty: "easy" };
+    setExperienceOptions(options);
+    setMission(1);
+    setPractice(false);
+    setSeedInput("");
+    setLoadout(["kit", "blanket", "rope"]);
+    setGame(
+      createGame(
+        Date.now(),
+        1,
+        ["kit", "blanket", "rope"],
+        readCareer().skills,
+        false,
+        options,
+      ),
+    );
+    setSelected("gate");
+    setFoundOpen(false);
+    setAbortOpen(false);
+    setHighlights([]);
+    setNotice("");
+    setTutorial(true);
+    setFeedback({
+      kind: "radio",
+      title: "긴급 구조 요청",
+      detail: "마지막 안부가 끊겼습니다. 북쪽 등산로에서 첫 흔적을 확인하세요.",
+    });
+    setScreen("game");
+    beep("radio");
   }
   function start() {
     if (mission === 6) {
@@ -260,9 +315,12 @@ export default function App() {
         loadout,
         readCareer().skills,
         practice,
+        mission === 1 ? experienceOptions : undefined,
       ),
     );
     setSelected("gate");
+    setFeedback(null);
+    setHighlights([]);
     setNotice("");
     setFoundOpen(false);
     setAbortOpen(false);
@@ -281,7 +339,11 @@ export default function App() {
     setNotice("");
     const next = transition(game, action, game.revision);
     setGame(next);
-    beep();
+    const response = actionFeedback(game, next, action);
+    setFeedback(response);
+    beep(response.kind);
+    if (next.status !== "active")
+      setHighlights(personalHighlights(next, stars(next)));
     if (!game.found && next.found && !settings.skipDialogue) setFoundOpen(true);
     if (next.status !== "active" && !saveRecord(next))
       setNotice(
@@ -297,9 +359,9 @@ export default function App() {
   }
   const region = regionFor(game.mission);
   const points = region.points;
-  const currentMission = missions[game.mission];
+  const currentMission = { ...missions[game.mission], limit: gameLimit(game) };
   const briefingMission = missions[mission];
-  const weather = weatherAt(game.mission, game.elapsed, game.seed);
+  const weather = gameWeather(game);
   const conditions = weatherInfo[weather];
   const time = currentMission.start + game.elapsed;
   const clock = `${Math.floor(time / 60)
@@ -384,12 +446,15 @@ export default function App() {
               <strong>모두 살아 돌아오는 것이 목표다.</strong>
             </p>
             <div className="menu-actions">
+              <button className="primary start-button" onClick={quickStart}>
+                <span>✚</span> 긴급 신고 · 첫 구조 시작{" "}
+                <small>신입 구조대장 · 안내를 따라 바로 출동</small>
+              </button>
               <button
-                className="primary start-button"
+                className="all-missions"
                 onClick={() => setScreen("missions")}
               >
-                <span>✚</span> 구조 임무 시작{" "}
-                <small>다음 구조 작전을 준비하세요</small>
+                모든 임무 · 이야기와 난이도 선택
               </button>
               <div className="menu-secondary">
                 <button onClick={() => setScreen("records")}>구조 기록</button>
@@ -409,7 +474,7 @@ export default function App() {
           </div>
           <footer className="menu-footer">
             <span>산을 읽고. 흔적을 따라. 함께 돌아오다.</span>
-            <span>구조대 지휘 작전 · 04</span>
+            <span>HEART OF RESCUE · 05</span>
           </footer>
         </main>
       )}
@@ -441,15 +506,30 @@ export default function App() {
             한 사람의 발자국.
             <br />그 끝에, 당신을 기다리는 누군가.
           </p>
+          {mission === 1 && (
+            <ExperienceSetup
+              value={experienceOptions}
+              onChange={setExperienceOptions}
+            />
+          )}
           <div className="briefing-grid">
             <section className="panel">
               <div className="section-title">▥ 수신된 무전</div>
-              <blockquote>“{briefingMission.description}”</blockquote>
+              <blockquote>
+                “
+                {mission === 1
+                  ? stories[experienceOptions.story].intro
+                  : briefingMission.description}
+                ”
+              </blockquote>
               <div className="mission-stats">
                 <div>
                   <small>수색 가능 시간</small>
                   <strong>
-                    {briefingMission.limit} <em>분</em>
+                    {mission === 1
+                      ? difficulties[experienceOptions.difficulty].limit
+                      : briefingMission.limit}{" "}
+                    <em>분</em>
                   </strong>
                 </div>
                 <div>
@@ -460,7 +540,11 @@ export default function App() {
                 </div>
                 <div>
                   <small>작전 난이도</small>
-                  <strong>{briefingMission.difficulty}</strong>
+                  <strong>
+                    {mission === 1
+                      ? difficulties[experienceOptions.difficulty].name
+                      : briefingMission.difficulty}
+                  </strong>
                 </div>
               </div>
             </section>
@@ -492,6 +576,7 @@ export default function App() {
               loadout={loadout}
               setLoadout={setLoadout}
               mission={mission}
+              experience={mission === 1 ? experienceOptions : undefined}
               seed={seedInput}
               setSeed={setSeedInput}
             />
@@ -548,6 +633,14 @@ export default function App() {
             </div>
           </div>
           <ForecastBar game={game} />
+          <ExperienceBar
+            game={game}
+            feedback={feedback}
+            tutorial={tutorial}
+            onTutorial={() => setTutorial(!tutorial)}
+            act={act}
+            busy={busy}
+          />
           <div className="operation-body">
             <div className="map-column">
               <MountainMap
@@ -640,11 +733,13 @@ export default function App() {
                   <span>귀환</span>
                 </div>
               </section>
-              {game.mission >= 3 && (
+              {(game.experience || game.mission >= 3) && (
                 <section className="panel region-intel">
                   <div className="section-title">{region.name} · 작전 정보</div>
                   <small>{region.inspiration}</small>
-                  {(game.mission === 3 || game.mission === 5) && (
+                  {(game.experience ||
+                    game.mission === 3 ||
+                    game.mission === 5) && (
                     <>
                       <p>
                         남은 후보 {game.possible.length}곳:{" "}
@@ -660,7 +755,11 @@ export default function App() {
                       ))}
                     </>
                   )}
-                  <p>{evaluationRules[game.mission]}</p>
+                  <p>
+                    {game.experience
+                      ? `${difficulties[game.experience.difficulty].name} · ${stories[game.experience.story].name} · 3별: 생존 65 이상·${Math.floor(gameLimit(game) * 0.9)}분 이내`
+                      : evaluationRules[game.mission]}
+                  </p>
                   {game.mission === 4 && (
                     <p>
                       강풍 노출 구간은 로프 필수. 부상자 동행: 시간 ×1.5 · 체력
@@ -670,8 +769,16 @@ export default function App() {
                 </section>
               )}
               <section className="panel casualty">
+                {game.experience && !game.found && (
+                  <p className="casualty-story">
+                    {stories[game.experience.story].intro}
+                  </p>
+                )}
                 <div className="section-title">
-                  ✚ {casualtyInfo[game.casualtyType].name}
+                  ✚{" "}
+                  {game.experience
+                    ? stories[game.experience.story].person
+                    : casualtyInfo[game.casualtyType].name}
                 </div>
                 <strong
                   className={game.found && game.health < 30 ? "orange" : ""}
@@ -722,7 +829,7 @@ export default function App() {
                   </span>
                 </div>
                 {game.clues.length ? (
-                  game.clues.map((c, i) => (
+                  [...game.clues].reverse().map((c, i) => (
                     <article key={i}>
                       <small>{point(c.location, game.mission).name}</small>
                       <p>{c.text}</p>
@@ -734,7 +841,9 @@ export default function App() {
                     <p>
                       산은 흔적을 남깁니다.
                       <br />
-                      제2전망대에서 수색을 시작하세요.
+                      {game.experience
+                        ? "북쪽 등산로에서 첫 흔적을 확인하세요."
+                        : "제2전망대에서 수색을 시작하세요."}
                     </p>
                   </div>
                 )}
@@ -771,7 +880,12 @@ export default function App() {
               >
                 <div className="rescue-cross">✚</div>
                 <span className="eyebrow orange">생존 확인 · 구조 1팀</span>
-                <h2 id="found-title">조난자를 발견했습니다!</h2>
+                <h2 id="found-title">이제, 함께 돌아갑니다.</h2>
+                {game.experience && (
+                  <p className="story-voice">
+                    {stories[game.experience.story].found}
+                  </p>
+                )}
                 <p>
                   “본부, 여기는 구조 1팀. 실종자를 발견했습니다.
                   <br />
@@ -838,7 +952,21 @@ export default function App() {
                     ? "전원 무사 귀환"
                     : "구조 임무 종료"}
                 </h2>
-                <p>{game.reason}</p>
+                <p>
+                  {game.status === "success" && game.experience
+                    ? stories[game.experience.story].ending
+                    : game.reason}
+                </p>
+                {highlights.length > 0 && (
+                  <div className="record-highlights">
+                    {highlights.map((t) => (
+                      <strong key={t}>◇ {t}</strong>
+                    ))}
+                  </div>
+                )}
+                {game.status === "failed" && (
+                  <p className="retry-tip">{failureTip(game)}</p>
+                )}
                 <small className="muted">
                   작전 시드 {game.seed} ·{" "}
                   {game.status === "failed"
@@ -848,7 +976,9 @@ export default function App() {
                       : "기록이 이 브라우저에 저장됩니다."}
                 </small>
                 <p className="evaluation-rule">
-                  {evaluationRules[game.mission]}
+                  {game.experience
+                    ? `${difficulties[game.experience.difficulty].name} · ${stories[game.experience.story].name} · 같은 이야기·난이도끼리 기록 비교`
+                    : evaluationRules[game.mission]}
                 </p>
                 <strong className="orange">
                   획득 경험치 +{earnedXp(game)}
@@ -893,6 +1023,9 @@ export default function App() {
                   <button disabled={busy} className="primary" onClick={start}>
                     다시 도전하기
                   </button>
+                  <button onClick={() => setScreen("briefing")}>
+                    이야기·난이도 변경
+                  </button>
                   <button onClick={() => setScreen("menu")}>메인 메뉴</button>
                 </div>
               </section>
@@ -923,6 +1056,12 @@ export default function App() {
                       {stats.completed ? "완료한 임무" : "미완료 임무"}
                     </span>
                     <h2>{missions[id].name}</h2>
+                    {id === 1 && (
+                      <small>
+                        모든 이야기·난이도 합산 · 개인 기록 갱신은 같은 조건끼리
+                        비교
+                      </small>
+                    )}
                     <p>
                       성공 {stats.wins}회 · 최고 평가 {stats.bestStars}별
                     </p>
@@ -952,10 +1091,17 @@ export default function App() {
                       <strong>{r.success ? "구조 성공" : "임무 종료"}</strong>
                       <small>
                         {r.date} · 임무 {r.mission.toString().padStart(2, "0")}
+                        {r.story && stories[r.story]
+                          ? ` · ${stories[r.story].name}`
+                          : ""}
+                        {r.difficulty && difficulties[r.difficulty]
+                          ? ` · ${difficulties[r.difficulty].name}`
+                          : ""}
                       </small>
                     </div>
                     <span>{r.time}분</span>
                     <span>생존 상태 {r.health}</span>
+                    <span>잔여 체력 {r.stamina}</span>
                     <span className="orange">
                       {r.grade
                         ? `${r.grade}등급 · ${r.rescued}명 구조`
@@ -979,7 +1125,7 @@ export default function App() {
                 [
                   "02",
                   "흔적을 읽으세요",
-                  "제2전망대에서 주변 수색을 실행하세요. 단서는 조난자가 향한 장소를 알려줍니다. 조난자 위치에 도착해서도 수색해야 발견합니다.",
+                  "첫 임무는 북쪽 등산로의 흔적부터 확인하세요. 방향·환경·결정적 단서를 얻을수록 지도 후보가 줄어듭니다. 후보 위치에 도착해서도 수색해야 발견합니다.",
                 ],
                 [
                   "03",

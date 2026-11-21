@@ -525,7 +525,7 @@ describe("4단계 저장 이전", () => {
     expect(readCommandCareer().bestGrade).toBe("B");
     expect(readCareer().xp).toBe(525);
     expect(missionStats([], 5).wins).toBe(4);
-    expect(JSON.parse(data.get("summit-rescue.records.v1")!).version).toBe(4);
+    expect(JSON.parse(data.get("summit-rescue.records.v1")!).version).toBe(5);
   });
   it("훈련과 미종료 작전은 보상을 저장하지 않음", () => {
     let g = createCommand(0);

@@ -1,3 +1,9 @@
+import {
+  difficulties,
+  gameForecast,
+  gameSchedule,
+  type ExperienceOptions,
+} from "./experience";
 import { useState } from "react";
 import { regionFor } from "./regions";
 import {
@@ -13,7 +19,6 @@ import {
   missionIds,
   recommendations,
   evaluationRules,
-  forecast,
   missions,
   schedule,
   weatherInfo,
@@ -126,15 +131,23 @@ export function MissionSelect({
               </div>
               <div className="mission-card-body">
                 <span className="eyebrow orange">
-                  임무 {String(id).padStart(2, "0")} · {missions[id].difficulty}
+                  임무 {String(id).padStart(2, "0")} ·{" "}
+                  {id === 1
+                    ? "이야기 3종 · 난이도 선택"
+                    : missions[id].difficulty}
                 </span>
                 <h2>{missions[id].name}</h2>
                 <p>{missions[id].subtitle}</p>
                 <small>{region.inspiration}</small>
                 <div>
-                  <span>제한 {missions[id].limit}분</span>
                   <span>
-                    {weatherInfo[schedule(id)[0].weather].name}
+                    제한 {id === 1 ? "270~330" : missions[id].limit}분
+                  </span>
+                  <span>
+                    {
+                      weatherInfo[id === 1 ? "cloudy" : schedule(id)[0].weather]
+                        .name
+                    }
                     {id === 5 ? " · 야간" : ""}
                   </span>
                 </div>
@@ -171,11 +184,13 @@ export function Loadout({
   mission,
   seed,
   setSeed,
+  experience,
 }: {
   loadout: Equipment[];
   setLoadout: (items: Equipment[]) => void;
   mission: MissionId;
   seed: string;
+  experience?: ExperienceOptions;
   setSeed: (value: string) => void;
 }) {
   return (
@@ -189,7 +204,7 @@ export function Loadout({
       </div>
       <p className="muted">
         {mission === 1
-          ? "첫 임무는 기본 응급처치만으로도 완료할 수 있습니다."
+          ? "부상자 동행에는 로프, 추위에는 방한포, 긴 귀환에는 응급키트가 유리합니다."
           : "빠른 계곡 길에는 로프, 늦은 귀환에는 방한포, 야간 수색에는 랜턴이 유리합니다."}{" "}
         최대 3개를 선택하세요. 권장:{" "}
         {recommendations[mission]
@@ -224,7 +239,12 @@ export function Loadout({
           );
         })}
       </div>
-      <p className="muted">평가 기준: {evaluationRules[mission]}</p>
+      <p className="muted">
+        평가 기준:{" "}
+        {experience
+          ? `3별: 생존 65 이상·${Math.floor(difficulties[experience.difficulty].limit * 0.9)}분 이내 / 2별: 생존 40 이상`
+          : evaluationRules[mission]}
+      </p>
       <label className="seed-input">
         작전 시드{" "}
         <input
@@ -240,7 +260,19 @@ export function Loadout({
         <span>같은 숫자는 같은 조난자 위치를 재현합니다.</span>
       </label>
       <div className="forecast-timeline">
-        {schedule(mission, Number(seed) || 0).map((p) => (
+        {(experience
+          ? gameSchedule({
+              mission,
+              seed: Number(seed) >>> 0,
+              experience: {
+                ...experience,
+                clueStage: 0,
+                prepared: false,
+                frontAnnounced: false,
+              },
+            })
+          : schedule(mission, Number(seed) || 0)
+        ).map((p) => (
           <span key={p.at}>
             <b>{p.at === 0 ? "출동" : `+${p.at}분`}</b>
             {weatherInfo[p.weather].icon} {weatherInfo[p.weather].name}
@@ -256,7 +288,7 @@ export function ForecastBar({ game }: { game: Game }) {
       className={`forecast-bar ${game.elapsed >= 70 && game.mission === 2 ? "warning" : ""}`}
     >
       <span>▥ 기상 예보</span>
-      <strong>{forecast(game.mission, game.elapsed, game.seed)}</strong>
+      <strong>{gameForecast(game)}</strong>
       <small>
         {game.elapsed >= missions[game.mission].sunset
           ? "야간 · 랜턴 없는 수색 +10분"
@@ -301,7 +333,8 @@ export function EncounterDialog({
                 <strong>{c.label}</strong>
                 <span>{c.detail}</span>
                 <small>
-                  {reason || `${c.cost.time}분 · 체력 ${c.cost.energy} 소모`}
+                  {reason ||
+                    `${c.cost.time}분 · 체력 ${Math.abs(c.cost.energy)} ${c.cost.energy < 0 ? "회복" : "소모"}`}
                 </small>
               </button>
             );

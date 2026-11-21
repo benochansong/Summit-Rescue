@@ -755,6 +755,31 @@ button.primary:hover:not(:disabled) {
 .result-stats strong {
   font-size: 1.3rem;
 }
+.result {
+  width: min(640px, 100%);
+  padding: 24px 30px;
+}
+.result .rescue-cross {
+  width: 46px;
+  height: 46px;
+  font-size: 1.6rem;
+  margin-bottom: 10px;
+}
+.result h2 {
+  margin: 10px 0;
+}
+.result p {
+  margin-block: 10px;
+  line-height: 1.6;
+}
+.result .stars {
+  margin: 12px 0;
+}
+.result .result-stats {
+  padding: 14px 0;
+  margin: 12px 0 18px;
+  gap: 12px;
+}
 .button-row {
   display: flex;
   gap: 12px;
@@ -2474,5 +2499,332 @@ html[data-motion="off"] .crew-map-marker {
   transition: none;
 }
 html[data-motion="off"] .command-overlays .air-marker circle {
+  animation: none;
+}
+/* Heart of Rescue: focus on the next decision. */
+.experience-setup {
+  margin-bottom: 24px;
+}
+.experience-setup h2 {
+  font-size: 29px;
+  margin: 12px 0 24px;
+}
+.experience-setup fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 20px;
+}
+.experience-setup legend {
+  font-size: 12px;
+  color: #bfcebd;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+.story-choices,
+.difficulty-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.story-choices label,
+.difficulty-choices label {
+  position: relative;
+  border: 1px solid #48605a;
+  background: #15302c;
+  padding: 18px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.story-choices label.chosen,
+.difficulty-choices label.chosen {
+  border-color: #e7b87e;
+  background: #2a3b32;
+  box-shadow: inset 0 2px 0 #e7b87e;
+}
+.experience-setup input {
+  accent-color: #edba7f;
+  margin: 0 8px 0 0;
+}
+.experience-setup strong {
+  font-size: 16px;
+}
+.experience-setup small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #b8c8b9;
+  margin-top: 9px;
+}
+.experience-setup label p {
+  font-size: 12px;
+  line-height: 1.9;
+  color: #c3cec0;
+  margin-bottom: 0;
+}
+.story-tip {
+  border-left: 2px solid #e2b77e;
+  padding: 10px 15px;
+  font-size: 13px;
+  line-height: 1.7;
+  background: #142c28;
+}
+.experience-bar {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(240px, 1.5fr) minmax(
+      170px,
+      1fr
+    );
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #465d50;
+  border-left: 3px solid #d6ab74;
+  background: #1b302a;
+  border-radius: 5px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.tension-label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  align-items: center;
+}
+.tension-label > span {
+  font: 10px monospace;
+  color: #d5ad77;
+  grid-row: 1 / 3;
+}
+.tension-label > strong {
+  font-size: 14px;
+}
+.tension-label > small {
+  font-size: 10px;
+  color: #aebead;
+}
+.tension-label .text-button {
+  font-size: 10px !important;
+  grid-column: 2;
+  justify-self: start;
+  padding: 2px 0 !important;
+}
+.next-guidance {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-left: 1px solid #4d6252;
+  padding-left: 12px;
+}
+.next-guidance > span {
+  font-size: 10px;
+  color: #e2b77e;
+  white-space: nowrap;
+}
+.next-guidance p {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+.next-guidance button {
+  font-size: 11px;
+  padding: 9px 12px;
+  white-space: nowrap;
+  color: #ffe0b3;
+  border-color: #a28560;
+  background: #3e4333;
+}
+.experience-bar .action-feedback {
+  margin: 0;
+  padding: 7px 10px;
+  min-height: 0;
+  max-height: none;
+  background: #102a25;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  border: 0;
+}
+.experience-bar .action-feedback strong {
+  color: #dfbd88;
+}
+.experience-bar .action-feedback span {
+  color: #c6d5be;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.experience-bar.stage-3 {
+  border-left-color: #df8e62;
+  background: #382f25;
+}
+.experience-bar.stage-4 {
+  border-left-color: #9dd0b0;
+}
+.feedback-clue,
+.feedback-aid,
+.feedback-found,
+.feedback-success {
+  animation: response-glow 1.2s ease-out;
+}
+.clues article:first-child {
+  border-left: 2px solid #dbad71;
+  padding-left: 12px;
+}
+.story-voice {
+  font-size: 16px !important;
+  line-height: 1.85 !important;
+  color: #e4cba4 !important;
+}
+.discovery .rescue-cross {
+  animation: discovery-beacon 2s ease-out;
+}
+.discovery .story-voice {
+  animation: story-arrival 1.2s ease-out;
+}
+.discovery .discovery-health {
+  animation: story-arrival 1.8s ease-out;
+}
+.discovery-ring {
+  animation: discovery-beacon 2s ease-out;
+}
+.record-highlights {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 12px 0;
+}
+.record-highlights strong {
+  font-size: 12px;
+  background: #2b4737;
+  border: 1px solid #779471;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: #d4e8c4;
+}
+.retry-tip {
+  border-left: 2px solid #dcb386;
+  background: #28382c;
+  padding: 12px;
+  text-align: left;
+  font-size: 13px !important;
+  line-height: 1.7;
+}
+.result .button-row {
+  flex-wrap: wrap;
+}
+.map-cost {
+  pointer-events: none;
+}
+.return-goal {
+  pointer-events: none;
+}
+@keyframes response-glow {
+  from {
+    box-shadow: inset 0 0 0 1px #e2ba73;
+    background: #43503a;
+  }
+  to {
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+@keyframes discovery-beacon {
+  0% {
+    opacity: 0.2;
+  }
+  35% {
+    opacity: 1;
+    filter: drop-shadow(0 0 9px #d6ddb2);
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes story-arrival {
+  from {
+    opacity: 0.3;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (max-width: 1100px) {
+  .experience-bar {
+    grid-template-columns: 1fr 1.6fr;
+  }
+  .experience-bar .action-feedback {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  .next-guidance button {
+    padding: 7px;
+  }
+  .tension-label > small {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .story-choices,
+  .difficulty-choices {
+    grid-template-columns: 1fr;
+  }
+  .story-choices label,
+  .difficulty-choices label {
+    padding: 15px;
+  }
+  .experience-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+    gap: 9px;
+  }
+  .tension-label {
+    grid-template-columns: auto 1fr auto;
+  }
+  .tension-label .text-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .next-guidance {
+    border: 0;
+    padding: 0;
+  }
+  .experience-bar .action-feedback {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .experience-setup h2 {
+    font-size: 23px;
+  }
+  .story-voice {
+    font-size: 14px !important;
+  }
+  .map-cost text {
+    font-size: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .experience-bar .action-feedback,
+  .discovery .rescue-cross,
+  .discovery .story-voice,
+  .discovery .discovery-health,
+  .discovery-ring {
+    animation: none;
+  }
+}
+html[data-motion="off"] .experience-bar .action-feedback,
+html[data-motion="off"] .discovery .rescue-cross,
+html[data-motion="off"] .discovery .story-voice,
+html[data-motion="off"] .discovery .discovery-health,
+html[data-motion="off"] .discovery-ring {
   animation: none;
 }
