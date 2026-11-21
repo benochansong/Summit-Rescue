@@ -1,9 +1,19 @@
+import {
+  difficulties,
+  stories,
+  heartCandidates,
+  evidence,
+  gameWeather,
+  gameForecast,
+  gameLimit,
+  type Experience,
+  type ExperienceOptions,
+} from "./experience";
 import { decayHealth, singleSubject } from "./casualties";
 import {
   forecast,
   missions,
   normalizeEquipment,
-  weatherAt,
   weatherInfo,
   missionType,
 } from "./conditions";
@@ -57,6 +67,7 @@ export type Game = {
   shelterSecured: boolean;
   lightSeen: boolean;
   routeReport: string[];
+  experience?: Experience;
 };
 export type Action =
   | { type: "move"; to: string }
@@ -73,7 +84,7 @@ export type Action =
   | { type: "choose"; choice: string };
 export type Cost = { time: number; energy: number };
 export type Encounter = {
-  kind: "river" | "ridge" | "signal" | "cold";
+  kind: "river" | "ridge" | "signal" | "cold" | "front" | "home";
   key: string;
   to?: string;
 };
@@ -87,8 +98,17 @@ export type Choice = {
   path?: string[];
   clue?: boolean;
   insulate?: boolean;
+  prepare?: boolean;
 };
 export const encounterInfo = {
+  front: {
+    title: "비구름이 예보보다 빠릅니다",
+    text: "기상 관측으로 비 도달 예보가 15분 앞당겨졌습니다. 모든 길은 열려 있지만 비가 오면 체력이 더 듭니다. 수색을 서두르거나 귀환에 대비하세요.",
+  },
+  home: {
+    title: "이제 함께 내려갈 길",
+    text: "동행으로 이동 부담이 늘었습니다. 노출 구간을 확보하거나 숲길로 우회할 수 있습니다. 빠른 통과는 조난자 상태를 소모합니다. 어느 길도 갑자기 사라지지 않습니다.",
+  },
   river: {
     title: "계곡의 급류",
     text: "불어난 물이 등산로를 가로막습니다. 로프로 확보하거나 실제 숲길과 나무다리를 거쳐 우회할 수 있습니다.",
@@ -112,15 +132,29 @@ export function createGame(
   items: Equipment[] = ["kit", "blanket", "rope"],
   skills: SkillLevels = zeroSkills(),
   practice = false,
+  options?: ExperienceOptions,
 ): Game {
   seed = seed >>> 0;
+  const experience =
+    mission === 1 && options
+      ? { ...options, clueStage: 0, frontAnnounced: false, prepared: false }
+      : undefined;
   return {
+    experience,
     seed,
-    target: regionFor(mission).candidates[seed % 3],
+    target: experience
+      ? heartCandidates[seed % 6]
+      : regionFor(mission).candidates[seed % 3],
     position: "base",
     elapsed: 0,
     stamina: 100,
-    health: mission === 4 ? 80 : mission === 5 ? 90 : 85,
+    health: experience
+      ? stories[experience.story].health
+      : mission === 4
+        ? 80
+        : mission === 5
+          ? 90
+          : 85,
     found: false,
     treated: false,
     visited: ["base"],
@@ -128,8 +162,12 @@ export function createGame(
     trail: ["base"],
     clues: [],
     log: [
-      `본부 기상 예보: ${forecast(mission, 0, seed)}`,
-      `본부: ${regionFor(mission).briefing}`,
+      experience
+        ? "본부: 비구름 접근 가능성. 상단 예보를 확인하고 귀환 여유를 확보하십시오."
+        : `본부 기상 예보: ${forecast(mission, 0, seed)}`,
+      experience
+        ? stories[experience.story].intro
+        : `본부: ${regionFor(mission).briefing}`,
     ],
     status: "active",
     reason: "",
@@ -141,12 +179,19 @@ export function createGame(
     insulated: false,
     pending: null,
     resolved: [],
-    injury: mission === 2 || mission === 4 ? 0.03 : 0,
-    casualtyType: missionType(mission),
+    injury:
+      mission === 2 || mission === 4 || experience?.story === "injured"
+        ? 0.03
+        : 0,
+    casualtyType: experience
+      ? stories[experience.story].type
+      : missionType(mission),
     skills: normalizeSkills(skills),
     practice,
     readings: [],
-    possible: [...regionFor(mission).candidates],
+    possible: experience
+      ? [...heartCandidates]
+      : [...regionFor(mission).candidates],
     shelterSecured: false,
     lightSeen: false,
     routeReport: [],
@@ -154,7 +199,7 @@ export function createGame(
   };
 }
 export function actionCost(g: Game, a: Action): Cost {
-  const weather = weatherAt(g.mission, g.elapsed, g.seed);
+  const weather = gameWeather(g);
   if (a.type === "move") {
     const edge = connection(g.position, a.to, g.mission);
     const steep = edge?.steep;
@@ -176,7 +221,8 @@ export function actionCost(g: Game, a: Action): Cost {
             (steep ? g.skills.mountain : 0),
         ) *
           (g.found ? (g.casualtyType === "injured" ? 1.6 : 1.4) : 1) *
-          (weather === "rain" ? 1.3 : 1),
+          (weather === "rain" ? 1.3 : 1) *
+          (g.experience ? difficulties[g.experience.difficulty].energy : 1),
       ),
     };
   }
@@ -240,13 +286,82 @@ function pathCost(g: Game, path: string[]): Cost {
 export function choicesFor(g: Game): Choice[] {
   const e = g.pending;
   if (!e) return [];
+  if (e.kind === "front")
+    return [
+      {
+        id: "continue",
+        label: "수색 지속",
+        detail: "정비 대신 시간을 확보합니다. 체력 2 소모.",
+        cost: { time: 0, energy: 2 },
+      },
+      {
+        id: "plan",
+        label: "안전 경로 계획",
+        detail: "노출 귀환 구간의 빠른 통과 손실을 6에서 2로 줄입니다.",
+        cost: { time: 8, energy: 1 },
+        prepare: true,
+      },
+      {
+        id: "shelter",
+        label: "현장 바람막이에서 정비",
+        detail: "체력 10 회복. 기다리는 동안 대상의 상태는 계속 악화됩니다.",
+        cost: { time: 15, energy: -10 },
+      },
+    ].filter(
+      (choice) => choice.id !== "plan" || g.experience?.difficulty !== "easy",
+    );
+  if (e.kind === "home") {
+    const base = actionCost(g, { type: "move", to: e.to! }),
+      path = safePath(g.position, "base", g.mission);
+    return [
+      {
+        id: "secure",
+        label: "확보 후 동행 이동",
+        detail:
+          "현재 선택 구간 통과. 로프가 있으면 준비 시간과 체력을 절약합니다.",
+        cost: {
+          time: base.time + (g.equipment.includes("rope") ? 5 : 10),
+          energy: base.energy + (g.equipment.includes("rope") ? 2 : 4),
+        },
+        path: [e.to!],
+      },
+      ...(path
+        ? [
+            {
+              id: "detour",
+              label: "안전한 숲길로 본부 귀환",
+              detail: path.map((id) => point(id, g.mission).name).join(" · "),
+              cost: pathCost(g, path),
+              path,
+            },
+          ]
+        : []),
+      {
+        id: "risk",
+        label: "빠른 귀환 선택",
+        detail: `선택 구간 통과 · 조난자 상태 −${g.experience?.prepared ? 2 : 6}`,
+        cost: { time: base.time, energy: base.energy },
+        health: g.experience?.prepared ? -2 : -6,
+        path: [e.to!],
+      },
+    ];
+  }
   if (e.kind === "signal")
     return [
       {
         id: "focus",
         label: "소리 방향 집중 수색",
-        detail: "목적지를 가리키는 단서 확보",
-        cost: { time: 10, energy: 4 },
+        detail: g.experience
+          ? "기존 단서와 대조해 후보를 한 단계 좁힙니다."
+          : "목적지를 가리키는 단서 확보",
+        cost: {
+          time: g.experience
+            ? g.experience.difficulty === "hard"
+              ? 14
+              : 8
+            : 10,
+          energy: 4,
+        },
         clue: true,
       },
       {
@@ -339,10 +454,7 @@ export function choicesFor(g: Game): Choice[] {
 export function choiceDisabled(g: Game, c: Choice): string {
   if (c.requires && !g.equipment.includes(c.requires)) return "필요 장비 없음";
   if (c.id === "kit" && g.kitUses >= 2) return "응급키트 소진";
-  if (
-    c.id === "drone" &&
-    (g.droneUses >= 2 || weatherAt(g.mission, g.elapsed, g.seed) === "wind")
-  )
+  if (c.id === "drone" && (g.droneUses >= 2 || gameWeather(g) === "wind"))
     return "드론 소진 또는 강풍으로 비행 불가";
   if (g.stamina < c.cost.energy)
     return "체력이 부족합니다. 경로 선택을 취소하고 휴식하세요.";
@@ -369,7 +481,7 @@ export function disabledReason(g: Game, a: Action): string {
   if (
     a.type === "move" &&
     connection(g.position, a.to, g.mission)?.ropeOnlyInWind &&
-    weatherAt(g.mission, g.elapsed, g.seed) === "wind" &&
+    gameWeather(g) === "wind" &&
     !g.equipment.includes("rope")
   )
     return "강풍으로 통행 제한: 구조 로프를 준비하거나 안전한 우회로를 선택하세요.";
@@ -409,7 +521,7 @@ export function disabledReason(g: Game, a: Action): string {
     a.type === "drone" &&
     (!g.equipment.includes("drone") ||
       g.droneUses >= 2 ||
-      weatherAt(g.mission, g.elapsed, g.seed) === "wind" ||
+      gameWeather(g) === "wind" ||
       g.found)
   )
     return "발견 전 2회 사용 가능하며 강풍에서는 비행할 수 없습니다.";
@@ -425,14 +537,16 @@ export function advance(g: Game, cost: Cost): Game {
     health = decayHealth(
       health,
       0.18 + g.injury,
-      weatherAt(g.mission, g.elapsed + i, g.seed),
+      gameWeather(g, g.elapsed + i),
       g.elapsed + i >= missions[g.mission].sunset,
       subject.insulated,
       subject.type === "cold",
+      g.experience ? 1 - difficulties[g.experience.difficulty].decay : 0,
     );
   }
   return {
     ...g,
+    experience: g.experience ? { ...g.experience } : undefined,
     elapsed: g.elapsed + cost.time,
     stamina: Math.min(100, Math.max(0, g.stamina - cost.energy)),
     health,
@@ -490,9 +604,21 @@ export function transition(
     };
   if (a.type === "choose" && a.choice === "cancel")
     return { ...g, pending: null, revision: g.revision + 1 };
+  if (
+    a.type === "move" &&
+    g.experience &&
+    g.found &&
+    g.experience.difficulty !== "easy" &&
+    !g.resolved.includes("home")
+  )
+    return {
+      ...g,
+      pending: { kind: "home", key: "home", to: a.to },
+      revision: g.revision + 1,
+    };
   if (a.type === "move" && g.mission === 2) {
     const risk = connection(g.position, a.to, g.mission)?.risk,
-      weather = weatherAt(g.mission, g.elapsed, g.seed);
+      weather = gameWeather(g);
     const key = `${g.position}>${a.to}:${risk}`;
     if (
       ((risk === "river" && weather === "rain") ||
@@ -530,6 +656,21 @@ export function transition(
       n.found = true;
       message =
         "본부, 여기는 구조 1팀. 실종자 발견! 생존 확인, 응급처치를 시작하겠습니다.";
+    } else if (g.experience) {
+      if (
+        ["gate", "lookout", "fork"].includes(g.position) &&
+        g.experience.clueStage < 3
+      ) {
+        const clue = evidence(g);
+        n.experience!.clueStage = clue.stage;
+        n.possible = clue.possible;
+        n.clues = [...n.clues, { location: g.position, text: clue.text }];
+        message = clue.text;
+      } else {
+        n.possible = n.possible.filter((id) => id !== g.position);
+        message =
+          "이 구역에서 대상의 흔적을 확인하지 못했습니다. 남은 후보와 본부 단서를 비교하세요.";
+      }
     } else if (g.mission >= 3) {
       let text = "새로운 흔적은 없습니다. 수신 기록과 후보 구역을 비교하세요.";
       if (g.mission === 3) {
@@ -617,7 +758,12 @@ export function transition(
   }
   if (a.type === "drone") {
     n.droneUses++;
-    const text = droneClue(g);
+    const clue = g.experience ? evidence(g, true) : null;
+    if (clue) {
+      n.experience!.clueStage = clue.stage;
+      n.possible = clue.possible;
+    }
+    const text = clue ? "항공 분석: " + clue.text : droneClue(g);
     n.clues = [...n.clues, { location: g.position, text }];
     message = text;
   }
@@ -634,21 +780,28 @@ export function transition(
     if (c.health && n.health > 0)
       n.health = Math.max(0, Math.min(100, n.health + c.health));
     if (c.insulate) n.insulated = true;
+    if (c.prepare && n.experience) n.experience.prepared = true;
     if (c.id === "kit") n.kitUses++;
     if (c.id === "drone") n.droneUses++;
     if (c.clue) {
+      const heartClue = g.experience ? evidence(g, c.id === "drone") : null;
+      if (heartClue) {
+        n.experience!.clueStage = heartClue.stage;
+        n.possible = heartClue.possible;
+      }
       const text =
-        c.id === "drone"
+        heartClue?.text ??
+        (c.id === "drone"
           ? droneClue(g)
-          : `구조 신호 방향 확인: ${point(g.target, g.mission).name}에서 호루라기 소리가 납니다.`;
+          : `구조 신호 방향 확인: ${point(g.target, g.mission).name}에서 호루라기 소리가 납니다.`);
       n.clues = [...n.clues, { location: g.position, text }];
     }
     message = `${c.label}. ${cost.time}분 경과, 체력 ${cost.energy} 소모.${c.health ? ` 생존 상태 ${c.health > 0 ? "+" : ""}${c.health}.` : ""}${c.clue ? " 새 단서를 확인하세요." : ""}`;
   }
   if (
-    n.elapsed > missions[n.mission].limit ||
+    n.elapsed > gameLimit(n) ||
     n.health <= 0 ||
-    (n.elapsed === missions[n.mission].limit && !rescueReady(n))
+    (n.elapsed === gameLimit(n) && !rescueReady(n))
   ) {
     n.status = "failed";
     n.reason =
@@ -666,6 +819,23 @@ export function transition(
             ? "마지막 불빛을 놓치지 않았습니다. 따뜻한 본부로 귀환 완료."
             : "전원 무사 귀환. 오늘, 한 사람의 내일을 지켰습니다.";
   }
+  if (n.status === "active" && n.experience && !n.pending) {
+    if (
+      !n.found &&
+      n.experience.clueStage >= 2 &&
+      !n.experience.frontAnnounced
+    ) {
+      n.experience.frontAnnounced = true;
+      n.pending = { kind: "front", key: "front" };
+    } else if (
+      !n.found &&
+      n.position === "fork" &&
+      n.experience.clueStage < 3 &&
+      !n.resolved.includes("signal")
+    ) {
+      n.pending = { kind: "signal", key: "signal" };
+    }
+  }
   if (n.status === "active" && n.mission === 2 && !n.pending) {
     if (
       n.found &&
@@ -681,13 +851,11 @@ export function transition(
     )
       n.pending = { kind: "signal", key: "signal" };
   }
-  const beforeWeather = weatherAt(g.mission, g.elapsed, g.seed),
-    afterWeather = weatherAt(n.mission, n.elapsed, n.seed);
+  const beforeWeather = gameWeather(g),
+    afterWeather = gameWeather(n);
   const weatherLog =
     beforeWeather !== afterWeather
-      ? [
-          `본부: ${weatherInfo[afterWeather].name} 관측. ${forecast(n.mission, n.elapsed, n.seed)}`,
-        ]
+      ? [`본부: ${weatherInfo[afterWeather].name} 관측. ${gameForecast(n)}`]
       : [];
   n.log = [message, ...weatherLog, ...g.log].slice(0, 30);
   return n;
@@ -714,7 +882,7 @@ export const stars = (g: Game): number => {
       : g.health >= 35
         ? 2
         : 1;
-  return g.health >= 65 && g.elapsed <= missions[g.mission].limit * 0.9
+  return g.health >= 65 && g.elapsed <= gameLimit(g) * 0.9
     ? 3
     : g.health >= 40
       ? 2
@@ -739,7 +907,16 @@ export const objective = (g: Game): string => {
       return "대피소에서 보온 정비 후 구조본부로 귀환하세요.";
     return "조난자와 함께 구조본부로 귀환하세요.";
   }
-  if ((g.mission === 3 || g.mission === 5) && g.possible.length === 1)
+  if (g.experience && !g.found && g.possible.length !== 1)
+    return g.experience.clueStage === 0
+      ? "북쪽 등산로에서 첫 흔적을 확인하세요."
+      : g.experience.clueStage === 1
+        ? "제2전망대에서 환경 단서를 비교하세요."
+        : "삼거리에서 신호를 확인해 후보를 좁히세요.";
+  if (
+    (g.experience || g.mission === 3 || g.mission === 5) &&
+    g.possible.length === 1
+  )
     return point(g.possible[0], g.mission).name + "에서 주변을 수색하세요.";
   if (g.mission === 3)
     return g.readings.length < 2

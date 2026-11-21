@@ -1,3 +1,4 @@
+import { actionCost } from "./game";
 import { crew, landingZones } from "./commandData";
 import { activeOrder, type CommandGame } from "./command";
 import { memo, useEffect, useRef, useState } from "react";
@@ -378,7 +379,7 @@ export default function MountainMap({
                 <circle cx={p.x} cy={p.y} r="24" fill="#ffd17b" opacity=".2" />
               )}
               {!game.found &&
-                game.mission >= 3 &&
+                (game.experience || game.mission >= 3) &&
                 game.possible.includes(p.id) && (
                   <circle
                     cx={p.x}
@@ -389,6 +390,49 @@ export default function MountainMap({
                     fill="none"
                   />
                 )}
+              {game.found && p.id === "base" && !command && (
+                <g className="return-goal">
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="25"
+                    fill="none"
+                    stroke="#9bd2b4"
+                    strokeWidth="3"
+                  />
+                  <text
+                    x={p.x}
+                    y={p.y - 34}
+                    textAnchor="middle"
+                    fontSize="18"
+                    fill="#bde9c7"
+                  >
+                    귀환 목표
+                  </text>
+                </g>
+              )}
+              {chosen && neighbors.includes(p.id) && !command && (
+                <g className="map-cost">
+                  <rect
+                    x={p.x - 66}
+                    y={p.y - 57}
+                    width="132"
+                    height="24"
+                    rx="5"
+                    fill="#0c272b"
+                  />
+                  <text
+                    x={p.x}
+                    y={p.y - 40}
+                    textAnchor="middle"
+                    fontSize="15"
+                    fill="#f0cd98"
+                  >
+                    {actionCost(game, { type: "move", to: p.id }).time}분 · 체력{" "}
+                    {actionCost(game, { type: "move", to: p.id }).energy}
+                  </text>
+                </g>
+              )}
               <circle cx={p.x} cy={p.y} r="24" fill="transparent" />
               {chosen && (
                 <circle
@@ -455,6 +499,15 @@ export default function MountainMap({
             }}
             pointerEvents="none"
           >
+            {game.found && (
+              <circle
+                r="28"
+                fill="none"
+                stroke="#a9debc"
+                strokeWidth="2"
+                className="discovery-ring"
+              />
+            )}
             <circle r="17" fill="#f5a15b" opacity=".2" className="pulse" />
             <path
               d="M-8 -13L0 -25 8 -13 0 -16Z"
