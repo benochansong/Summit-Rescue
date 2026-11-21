@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { adjacent, edges, point, points } from "./game";
+import { adjacent, point, regionFor } from "./regions";
+import { missions } from "./conditions";
 import type { Game } from "./game";
 
 const Contours = memo(function Contours() {
@@ -46,6 +47,25 @@ export default function MountainMap({
   weather?: string;
   animate?: boolean;
 }) {
+  const region = regionFor(game.mission),
+    points = region.points,
+    edges = region.edges;
+  const night = game.mission === 5 && game.elapsed >= missions[5].sunset;
+  const visible = new Set([
+    ...game.visited,
+    ...adjacent(game.position, game.mission),
+    ...(game.equipment.includes("lantern")
+      ? adjacent(game.position, game.mission).flatMap((id) =>
+          adjacent(id, game.mission),
+        )
+      : []),
+  ]);
+  const palette =
+    region.theme === "granite"
+      ? ["#858c91", "#4b5961", "#2d3b44"]
+      : region.theme === "night"
+        ? ["#2f4851", "#183037", "#102126"]
+        : ["#5d7158", "#354d40", "#203a33"];
   const [zoom, setZoom] = useState(1);
   const svgRef = useRef<SVGSVGElement>(null);
   const [mapHeight, setMapHeight] = useState(800);
@@ -62,10 +82,10 @@ export default function MountainMap({
   }, []);
   const verticalScale = (mapHeight - 38) / 800;
   const mapPoint = (id: string) => ({
-    ...point(id),
-    y: point(id).y * verticalScale,
+    ...point(id, game.mission),
+    y: point(id, game.mission).y * verticalScale,
   });
-  const neighbors = adjacent(game.position);
+  const neighbors = adjacent(game.position, game.mission);
   const trailLength = useRef(game.trail.length);
   const [marker, setMarker] = useState({ id: game.position, duration: 650 });
   useEffect(() => {
@@ -87,23 +107,25 @@ export default function MountainMap({
   }, [game.trail, game.position, animate]);
   const here = mapPoint(marker.id);
   return (
-    <div className={`map-wrap weather-${weather}`}>
+    <div
+      className={`map-wrap region-${region.theme} weather-${weather} ${night ? "is-night" : ""}`}
+    >
       <div className="map-heading">
-        <span className="eyebrow">작전 구역 · 백운산 국립공원</span>
-        <span>북부 탐방로 / 지형도</span>
+        <span className="eyebrow">작전 구역 · {region.name}</span>
+        <span>{region.inspiration}</span>
       </div>
       <svg
         ref={svgRef}
         className="terrain"
         viewBox={`${500 - 500 / zoom} ${mapHeight / 2 - mapHeight / 2 / zoom} ${1000 / zoom} ${mapHeight / zoom}`}
-        aria-label="백운산 수색 지도"
+        aria-label={`${region.name} 수색 지도`}
         role="group"
       >
         <defs>
           <radialGradient id="land">
-            <stop stopColor="#5d7158" />
-            <stop offset=".55" stopColor="#354d40" />
-            <stop offset="1" stopColor="#203a33" />
+            <stop stopColor={palette[0]} />
+            <stop offset=".55" stopColor={palette[1]} />
+            <stop offset="1" stopColor={palette[2]} />
           </radialGradient>
           <linearGradient id="ridge" x2=".8" y2="1">
             <stop stopColor="#acb49a" stopOpacity=".35" />
@@ -157,6 +179,28 @@ export default function MountainMap({
             opacity=".09"
           />
           <Contours />
+          {region.theme === "granite" && (
+            <g fill="#b9c0bf" opacity=".18">
+              <path d="M210 480L330 110 470 350 640 90 860 410 700 350 570 520 440 400Z" />
+              <path
+                d="M330 110L340 390 210 480M640 90L660 350 570 520"
+                stroke="#eef1ed"
+                strokeWidth="3"
+              />
+            </g>
+          )}
+          {region.theme === "night" && (
+            <g fill="#d4dfd2" opacity=".4">
+              {Array.from({ length: 35 }, (_, i) => (
+                <circle
+                  key={i}
+                  cx={(i * 97) % 1000}
+                  cy={(i * 61) % 180}
+                  r={i % 3 === 0 ? 2 : 1}
+                />
+              ))}
+            </g>
+          )}
           <rect width="1000" height="800" fill="url(#grid)" />
           <path
             d="M960 300Q865 320 840 410T740 510Q690 560 770 610T805 800"
@@ -179,35 +223,38 @@ export default function MountainMap({
             opacity=".5"
           />
           <g className="forest" opacity=".45">
-            {Array.from({ length: 145 }, (_, i) => {
-              const x = ((i * 137.53) % 940) + 30,
-                y = ((i * 83.77) % 680) + 65;
-              if (points.some((p) => Math.hypot(p.x - x, p.y - y) < 45))
-                return null;
-              return (
-                <g key={i} transform={`translate(${x} ${y})`}>
-                  <path
-                    d="M0 -11L-7 3H-5L-10 10H10L5 3H7Z"
-                    fill={i % 3 ? "#142d25" : "#92a281"}
-                  />
-                  <path d="M0 8V15" stroke="#182f27" strokeWidth="2" />
-                </g>
-              );
-            })}
+            {Array.from(
+              { length: region.theme === "granite" ? 28 : 145 },
+              (_, i) => {
+                const x = ((i * 137.53) % 940) + 30,
+                  y = ((i * 83.77) % 680) + 65;
+                if (points.some((p) => Math.hypot(p.x - x, p.y - y) < 45))
+                  return null;
+                return (
+                  <g key={i} transform={`translate(${x} ${y})`}>
+                    <path
+                      d="M0 -11L-7 3H-5L-10 10H10L5 3H7Z"
+                      fill={i % 3 ? "#142d25" : "#92a281"}
+                    />
+                    <path d="M0 8V15" stroke="#182f27" strokeWidth="2" />
+                  </g>
+                );
+              },
+            )}
           </g>
           <g fill="#c4d0bb" opacity=".25" fontSize="17" letterSpacing="8">
             <text x="345" y="145" transform="rotate(-22 345 145)">
-              백 운 능 선
+              {region.terrainWords[0]}
             </text>
             <text x="110" y="400" transform="rotate(-72 110 400)">
-              서쪽 원시림
+              {region.terrainWords[1]}
             </text>
             <text x="805" y="530" transform="rotate(25 805 530)">
-              물소리 계곡
+              {region.terrainWords[2]}
             </text>
           </g>
         </g>
-        {!game.found && (
+        {!game.found && game.mission < 3 && (
           <ellipse
             cx="500"
             cy={380 * verticalScale}
@@ -220,6 +267,35 @@ export default function MountainMap({
             strokeOpacity=".3"
           />
         )}
+        {night && (
+          <>
+            <defs>
+              <mask id="night-visibility">
+                <rect width="1000" height={mapHeight} fill="white" />
+                {[...visible].map((id) => {
+                  const p = mapPoint(id);
+                  return (
+                    <circle
+                      key={id}
+                      cx={p.x}
+                      cy={p.y}
+                      r={game.equipment.includes("lantern") ? 90 : 65}
+                      fill="black"
+                    />
+                  );
+                })}
+              </mask>
+            </defs>
+            <rect
+              width="1000"
+              height={mapHeight}
+              fill="#030d16"
+              opacity=".75"
+              mask="url(#night-visibility)"
+              pointerEvents="none"
+            />
+          </>
+        )}
         {edges.map((e) => {
           const a = mapPoint(e.a),
             b = mapPoint(e.b);
@@ -231,7 +307,12 @@ export default function MountainMap({
                 (p === e.b && game.trail[i - 1] === e.a)),
           );
           return (
-            <g key={e.a + e.b}>
+            <g
+              key={e.a + e.b}
+              opacity={
+                night && !visible.has(e.a) && !visible.has(e.b) ? 0.18 : 1
+              }
+            >
               <path
                 d={`M${a.x} ${a.y}L${b.x} ${b.y}`}
                 stroke="#142923"
@@ -241,13 +322,17 @@ export default function MountainMap({
                 d={`M${a.x} ${a.y}L${b.x} ${b.y}`}
                 fill="none"
                 stroke={
-                  available
-                    ? "#edc78d"
-                    : visited
-                      ? "#a7be9c"
-                      : e.steep
-                        ? "#b88b68"
-                        : "#89957c"
+                  e.ropeOnlyInWind &&
+                  weather === "wind" &&
+                  !game.equipment.includes("rope")
+                    ? "#dd8f79"
+                    : available
+                      ? "#edc78d"
+                      : visited
+                        ? "#a7be9c"
+                        : e.steep
+                          ? "#b88b68"
+                          : "#89957c"
                 }
                 strokeWidth={available ? 3 : 2}
                 strokeDasharray={visited ? "none" : e.steep ? "3 7" : "6 5"}
@@ -265,11 +350,13 @@ export default function MountainMap({
               key={p.id}
               className="map-node"
               opacity={
-                weather === "fog" &&
-                !game.visited.includes(p.id) &&
-                !neighbors.includes(p.id)
-                  ? 0.4
-                  : 1
+                night && !visible.has(p.id)
+                  ? 0.15
+                  : weather === "fog" &&
+                      !game.visited.includes(p.id) &&
+                      !neighbors.includes(p.id)
+                    ? 0.4
+                    : 1
               }
               role="button"
               tabIndex={busy ? -1 : 0}
@@ -283,6 +370,21 @@ export default function MountainMap({
                 }
               }}
             >
+              {p.kind === "shelter" && region.theme === "night" && (
+                <circle cx={p.x} cy={p.y} r="24" fill="#ffd17b" opacity=".2" />
+              )}
+              {!game.found &&
+                game.mission >= 3 &&
+                game.possible.includes(p.id) && (
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="20"
+                    stroke="#e5b17c"
+                    strokeDasharray="4 5"
+                    fill="none"
+                  />
+                )}
               <circle cx={p.x} cy={p.y} r="24" fill="transparent" />
               {chosen && (
                 <circle

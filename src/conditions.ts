@@ -1,6 +1,19 @@
 export type Weather = "clear" | "cloudy" | "fog" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
-export type MissionId = 1 | 2;
+export type MissionId = 1 | 2 | 3 | 4 | 5;
+export const missionIds: MissionId[] = [1, 2, 3, 4, 5];
+export type CasualtyType = "lost" | "injured" | "cold";
+export const casualtyInfo = {
+  lost: { name: "길을 잃은 등산객", detail: "기본 동행 비용 · 정보 수색 중심" },
+  injured: {
+    name: "다친 등산객",
+    detail: "기본 처치 필수 · 동행 시간 ×1.5, 체력 ×1.6",
+  },
+  cold: {
+    name: "저체온 위험 등산객",
+    detail: "추가 추위 악화 · 보온과 대피소 활용",
+  },
+};
 export const equipment: {
   id: Equipment;
   name: string;
@@ -76,25 +89,95 @@ export const missions = {
     description:
       "오후 늦게 등산객 한 명이 계곡 방향으로 향한 뒤 연락이 끊겼습니다. 제2전망대의 이동 기록을 확인하십시오. 70분 뒤 폭우가 예보되어 있습니다. 계곡의 빠른 길과 숲길 우회로를 신중하게 선택하십시오.",
   },
+  3: {
+    name: "안개가 삼킨 능선",
+    subtitle: "정보를 읽는 구조",
+    limit: 300,
+    start: 10 * 60 + 40,
+    sunset: 440,
+    difficulty: "보통",
+    description:
+      "오전 10시 40분, 홀로 등산하던 사람이 짙은 안개 속에서 길을 잃었습니다. 마지막 무전에서는 계곡 물소리만 확인되었습니다. 청음 전망대의 흔적과 서로 다른 지점의 무전 신호를 비교하십시오.",
+  },
+  4: {
+    name: "위험한 암릉",
+    subtitle: "귀환을 위한 선택",
+    limit: 360,
+    start: 13 * 60 + 20,
+    sunset: 280,
+    difficulty: "어려움",
+    description:
+      "오후 1시 20분, 고산 암릉에서 등산객이 넘어져 다쳤습니다. 암릉 관측소에서 신고 기록을 확인하십시오. 강풍 중 노출 경로는 로프가 필요합니다. 긴 우회로는 체력 소모가 작고 부상자에게 안전합니다.",
+  },
+  5: {
+    name: "마지막 불빛",
+    subtitle: "어둠 속의 길잡이",
+    limit: 330,
+    start: 18 * 60 + 10,
+    sunset: 30,
+    difficulty: "어려움",
+    description:
+      "오후 6시 10분, 대피소에 도착하지 않은 등산객의 실종 신고가 들어왔습니다. 첫빛 대피소에서 기록을 확인하고 간헐적인 불빛을 추적하십시오. 조난자와 귀환할 때 대피소에서 보온 정비를 해야 합니다.",
+  },
 } as const;
+export const missionType = (id: MissionId): CasualtyType =>
+  id === 4 ? "injured" : id === 5 ? "cold" : "lost";
+export const recommendations: Record<MissionId, Equipment[]> = {
+  1: ["kit", "blanket", "rope"],
+  2: ["kit", "blanket", "rope"],
+  3: ["drone", "lantern", "kit"],
+  4: ["rope", "kit", "blanket"],
+  5: ["lantern", "blanket", "kit"],
+};
+export const evaluationRules: Record<MissionId, string> = {
+  1: "3별: 생존 65 이상·162분 이내 / 2별: 생존 40 이상",
+  2: "3별: 생존 65 이상·252분 이내 / 2별: 생존 40 이상",
+  3: "3별: 두 지점 이상 신호 분석·후보 1곳 확정·생존 55 이상 / 2별: 분석 1회 이상·생존 35 이상",
+  4: "3별: 기본 처치·안전 귀환·강행 없음·생존 60 이상 / 2별: 생존 35 이상",
+  5: "3별: 구조 신호 확인·귀환 중 대피소 보온·생존 55 이상 / 2별: 생존 35 이상",
+};
 export const schedule = (
   mission: MissionId,
+  seed = 0,
 ): { at: number; weather: Weather }[] =>
   mission === 1
     ? [{ at: 0, weather: "clear" }]
-    : [
-        { at: 0, weather: "cloudy" },
-        { at: 35, weather: "fog" },
-        { at: 70, weather: "rain" },
-        { at: 130, weather: "wind" },
-        { at: 190, weather: "snow" },
-      ];
-export const weatherAt = (mission: MissionId, elapsed: number): Weather =>
-  schedule(mission)
+    : mission === 2
+      ? [
+          { at: 0, weather: "cloudy" },
+          { at: 35, weather: "fog" },
+          { at: 70, weather: "rain" },
+          { at: 130, weather: "wind" },
+          { at: 190, weather: "snow" },
+        ]
+      : mission === 3
+        ? [
+            { at: 0, weather: "fog" },
+            { at: 120 + (Math.floor(seed / 3) % 3) * 10, weather: "cloudy" },
+            { at: 200 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
+          ]
+        : mission === 4
+          ? [
+              { at: 0, weather: "wind" },
+              { at: 90 + (Math.floor(seed / 3) % 3) * 10, weather: "cloudy" },
+              { at: 160 + (Math.floor(seed / 3) % 3) * 10, weather: "wind" },
+              { at: 240 + (Math.floor(seed / 3) % 3) * 10, weather: "cloudy" },
+            ]
+          : [
+              { at: 0, weather: "cloudy" },
+              { at: 65 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
+              { at: 150 + (Math.floor(seed / 3) % 3) * 10, weather: "clear" },
+            ];
+export const weatherAt = (
+  mission: MissionId,
+  elapsed: number,
+  seed = 0,
+): Weather =>
+  schedule(mission, seed)
     .filter((p) => p.at <= elapsed)
     .at(-1)!.weather;
-export function forecast(mission: MissionId, elapsed: number) {
-  const next = schedule(mission).find((p) => p.at > elapsed);
+export function forecast(mission: MissionId, elapsed: number, seed = 0) {
+  const next = schedule(mission, seed).find((p) => p.at > elapsed);
   return next
     ? `${next.at - elapsed}분 후 ${weatherInfo[next.weather].name} · ${weatherInfo[next.weather].detail}`
     : "추가 기상 변화 없음";

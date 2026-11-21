@@ -1705,3 +1705,230 @@ input[type="checkbox"] {
     stroke-width: 3px;
   }
 }
+.mission-page {
+  max-width: 1400px;
+}
+.mission-page .mission-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mission-card:disabled {
+  opacity: 0.6;
+}
+.mission-art > b {
+  position: absolute;
+  bottom: 18px;
+  left: 24px;
+  letter-spacing: 0.1em;
+  color: #e1e3d4;
+}
+.mission-card-body > small {
+  display: block;
+  color: #8da396;
+  font-size: 0.75rem;
+}
+.mission-card-body .recommended {
+  font-size: 0.8rem;
+  color: #b7c5ae;
+}
+.region-card-mist .mission-art {
+  background: linear-gradient(135deg, #869687, #283d33);
+}
+.region-card-mist .mini-mountains {
+  filter: blur(4px);
+  opacity: 0.65;
+}
+.region-card-granite .mission-art {
+  background: linear-gradient(135deg, #a1a8aa, #374852);
+}
+.region-card-granite .mini-mountains {
+  clip-path: polygon(
+    0 80%,
+    15% 50%,
+    25% 65%,
+    42% 12%,
+    48% 52%,
+    70% 0,
+    80% 70%,
+    92% 30%,
+    100% 68%,
+    100% 100%,
+    0 100%
+  );
+  background: linear-gradient(130deg, #bcc4c4, #33434a);
+}
+.region-card-night .mission-art {
+  background: radial-gradient(at 70% 20%, #334b5b, #10202b 70%);
+}
+.region-card-night .mini-mountains {
+  background: #203b37;
+}
+.cabin-light {
+  position: absolute;
+  bottom: 25px;
+  right: 50px;
+  width: 12px;
+  height: 15px;
+  background: #ffd794;
+  box-shadow: 0 0 30px 13px #fbd47566;
+}
+.career-panel {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+}
+.career-panel > div:first-child {
+  flex: 1;
+  min-width: 200px;
+}
+.career-panel h2 {
+  font-size: 1.3rem;
+  margin-top: 0;
+}
+.career-panel p {
+  font-size: 0.85rem;
+  color: #a1b5a7;
+  line-height: 1.8;
+}
+.skill-cards {
+  display: flex;
+  flex: 3;
+  gap: 15px;
+  min-width: 0;
+}
+.skill-cards > div {
+  flex: 1;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+}
+.skill-cards strong {
+  font-size: 0.9rem;
+}
+.skill-cards strong span {
+  color: #e5b27c;
+}
+.skill-cards button {
+  font-size: 0.75rem;
+  padding: 9px;
+}
+.training-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 25px 0 0;
+  font-size: 0.9rem;
+}
+.training-toggle small {
+  display: block;
+  color: #91a794;
+  margin-top: 5px;
+}
+.special-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+.special-actions > span {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: #a2b6a4;
+  max-width: 260px;
+}
+.special-actions button {
+  min-width: 100px;
+  padding: 8px;
+}
+.special-actions button small {
+  font-size: 0.7rem;
+}
+.region-intel small {
+  font-size: 0.75rem;
+  color: #92a394;
+}
+.region-intel b {
+  color: #efbb83;
+}
+.region-intel {
+  border-color: #d9b17a35;
+}
+.region-subtitle {
+  color: #a3b7a8;
+  font-size: 0.9rem;
+}
+.evaluation-rule {
+  font-size: 0.8rem !important;
+}
+.route-report {
+  text-align: left;
+  margin-top: 15px;
+  font-size: 0.8rem;
+  color: #afc0b1;
+}
+.route-report p {
+  font-size: 0.75rem !important;
+}
+.region-granite .node-label {
+  stroke: #35454d;
+}
+.region-night .node-label {
+  stroke: #142b31;
+}
+.region-night .map-legend {
+  background: #081e27b3;
+}
+.is-night {
+  box-shadow: inset 0 0 80px #0008;
+}
+.region-mist .fog {
+  opacity: 0.12;
+}
+.region-night .rescue-marker circle {
+  fill: #ffe5a6;
+}
+.region-night .map-compass {
+  color: #c8d4df;
+}
+.in-game .special-actions .action-button {
+  padding: 8px;
+}
+@media (max-width: 1100px) {
+  .mission-page .mission-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  .career-panel {
+    display: block;
+  }
+  .skill-cards {
+    margin-top: 20px;
+  }
+  .special-actions {
+    flex-wrap: wrap;
+  }
+  .special-actions > span {
+    max-width: none;
+  }
+  .special-actions .action-button {
+    min-width: 85px;
+  }
+}
+@media (max-width: 650px) {
+  .mission-page .mission-cards {
+    grid-template-columns: 1fr;
+  }
+  .skill-cards {
+    flex-direction: column;
+  }
+  .special-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .special-actions > span {
+    grid-column: 1/-1;
+  }
+  .mission-card-body {
+    padding: 22px;
+  }
+}

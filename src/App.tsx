@@ -1,3 +1,4 @@
+import { regionFor } from "./regions";
 import { useEffect, useRef, useState } from "react";
 import MountainMap from "./Map";
 import {
@@ -8,7 +9,9 @@ import {
   healthLabel,
   objective,
   point,
-  points,
+  earnedXp,
+  moveHealthCost,
+  signalDirection,
   stars,
   transition,
 } from "./game";
@@ -16,11 +19,21 @@ import type { Action } from "./game";
 import {
   missionStats,
   readRecords,
+  readCareer,
   readSettings,
   saveRecord,
   saveSettings,
 } from "./storage";
-import { equipment, missions, weatherAt, weatherInfo } from "./conditions";
+import {
+  casualtyInfo,
+  equipment,
+  evaluationRules,
+  missionIds,
+  missions,
+  recommendations,
+  weatherAt,
+  weatherInfo,
+} from "./conditions";
 import type { Equipment, MissionId } from "./conditions";
 import {
   EncounterDialog,
@@ -117,6 +130,7 @@ export default function App() {
     "blanket",
     "rope",
   ]);
+  const [practice, setPractice] = useState(false);
   const [seedInput, setSeedInput] = useState("");
   const [game, setGame] = useState(() => createGame());
   const [selected, setSelected] = useState("gate");
@@ -215,6 +229,8 @@ export default function App() {
         seedInput.trim() ? Number(seedInput) >>> 0 : Date.now(),
         mission,
         loadout,
+        readCareer().skills,
+        practice,
       ),
     );
     setSelected("gate");
@@ -237,7 +253,7 @@ export default function App() {
     const next = transition(game, action, game.revision);
     setGame(next);
     beep();
-    if (!game.found && next.found) setFoundOpen(true);
+    if (!game.found && next.found && !settings.skipDialogue) setFoundOpen(true);
     if (next.status !== "active" && !saveRecord(next))
       setNotice(
         "브라우저 저장 공간을 사용할 수 없어 이번 기록은 저장하지 못했습니다.",
@@ -250,9 +266,11 @@ export default function App() {
       settings.motion ? 650 : 250,
     );
   }
+  const region = regionFor(game.mission);
+  const points = region.points;
   const currentMission = missions[game.mission];
   const briefingMission = missions[mission];
-  const weather = weatherAt(game.mission, game.elapsed);
+  const weather = weatherAt(game.mission, game.elapsed, game.seed);
   const conditions = weatherInfo[weather];
   const time = currentMission.start + game.elapsed;
   const clock = `${Math.floor(time / 60)
@@ -294,7 +312,7 @@ export default function App() {
           <Emblem />
           <span>
             <b>SUMMIT RESCUE</b>
-            <small>백운산 산악구조대</small>
+            <small>통합 산악구조대</small>
           </span>
         </button>
         <div className="header-right">
@@ -352,14 +370,16 @@ export default function App() {
           </div>
           <footer className="menu-footer">
             <span>산을 읽고. 흔적을 따라. 함께 돌아오다.</span>
-            <span>폭풍 경보 · 02</span>
+            <span>산악 구조 작전 · 03</span>
           </footer>
         </main>
       )}
       {screen === "missions" && (
         <MissionSelect
           onBack={() => setScreen("menu")}
-          onSelect={(id) => {
+          onSelect={(id, training) => {
+            setPractice(training);
+            setLoadout([...recommendations[id]]);
             setMission(id);
             setScreen("briefing");
           }}
@@ -374,6 +394,10 @@ export default function App() {
             긴급 구조 요청 · 임무 {mission.toString().padStart(2, "0")}
           </div>
           <h1>{briefingMission.name}</h1>
+          <p className="region-subtitle">
+            {regionFor(mission).inspiration} ·{" "}
+            {practice ? "훈련 모드" : "정규 출동"}
+          </p>
           <p className="page-lead">
             한 사람의 발자국.
             <br />그 끝에, 당신을 기다리는 누군가.
@@ -404,7 +428,7 @@ export default function App() {
             <section className="panel">
               <div className="section-title">출동 전 확인</div>
               <ol className="brief-steps">
-                <li>제2전망대까지 등산로를 따라 이동</li>
+                <li>{regionFor(mission).briefing}</li>
                 <li>주변을 수색하고 단서의 방향 확인</li>
                 <li>조난자 발견 후 응급처치</li>
                 <li>조난자와 구조본부로 무사 귀환</li>
@@ -434,8 +458,10 @@ export default function App() {
           <div className="mission-strip">
             <div>
               <span className="eyebrow orange">
-                진행 중인 구조 작전 · 임무{" "}
-                {game.mission.toString().padStart(2, "0")}
+                {game.practice
+                  ? "훈련 출동 · 기록 미저장"
+                  : "진행 중인 구조 작전"}{" "}
+                · 임무 {game.mission.toString().padStart(2, "0")}
               </span>
               <h1>{currentMission.name}</h1>
             </div>
@@ -497,20 +523,21 @@ export default function App() {
                         {p.name}
                         {p.id === game.position
                           ? " (현재)"
-                          : adjacent(game.position).includes(p.id)
+                          : adjacent(game.position, game.mission).includes(p.id)
                             ? " (이동 가능)"
                             : ""}
                       </option>
                     ))}
                   </select>
                   <small>
-                    선택한 지점 · 해발 {point(selected).elevation} m
+                    선택한 지점 · 해발 {point(selected, game.mission).elevation}{" "}
+                    m
                   </small>
                   <span>
                     {selected === game.position
                       ? "현재 위치"
-                      : adjacent(game.position).includes(selected)
-                        ? `이동 ${cost.time}분 · 체력 ${cost.energy} 소모`
+                      : adjacent(game.position, game.mission).includes(selected)
+                        ? `이동 ${cost.time}분 · 체력 ${cost.energy} 소모${moveHealthCost(game, selected) ? " · 조난자 상태 −6" : ""}`
                         : "연결된 지점을 거쳐 이동하세요"}
                   </span>
                 </div>
@@ -521,6 +548,25 @@ export default function App() {
                   {button({ type: "aid" }, "응급처치")}
                 </div>
               </div>
+              {(game.mission === 3 || game.mission === 5) && (
+                <div className="special-actions">
+                  {button(
+                    { type: "scan" },
+                    game.mission === 3 ? "무전 신호 분석" : "불빛 관측",
+                    true,
+                  )}
+                  {button({ type: "wait" }, "10분 대기")}
+                  {game.mission === 5 &&
+                    button({ type: "shelter" }, "대피소 보온")}
+                  <span>
+                    {game.mission === 5
+                      ? signalDirection(game)
+                        ? signalDirection(game) + "쪽에서 희미한 불빛"
+                        : "신호 대기 · 일몰 후 15분 간격 점멸"
+                      : "신호 강도는 경로 거리 기준입니다. 여러 지점을 비교하세요."}
+                  </span>
+                </div>
+              )}
               <div className="action-feedback" role="status">
                 <span className="orange">▥</span>
                 {notice || game.log[0]}
@@ -546,8 +592,39 @@ export default function App() {
                   <span>귀환</span>
                 </div>
               </section>
+              {game.mission >= 3 && (
+                <section className="panel region-intel">
+                  <div className="section-title">{region.name} · 작전 정보</div>
+                  <small>{region.inspiration}</small>
+                  {(game.mission === 3 || game.mission === 5) && (
+                    <>
+                      <p>
+                        남은 후보 {game.possible.length}곳:{" "}
+                        {game.possible
+                          .map((id) => point(id, game.mission).name)
+                          .join(" · ")}
+                      </p>
+                      {game.readings.map((r) => (
+                        <p key={r.location}>
+                          {point(r.location, game.mission).name}{" "}
+                          <b>{r.strength}/100</b>
+                        </p>
+                      ))}
+                    </>
+                  )}
+                  <p>{evaluationRules[game.mission]}</p>
+                  {game.mission === 4 && (
+                    <p>
+                      강풍 노출 구간은 로프 필수. 부상자 동행: 시간 ×1.5 · 체력
+                      ×1.6. 로프 없는 노출 이동: 상태 −6.
+                    </p>
+                  )}
+                </section>
+              )}
               <section className="panel casualty">
-                <div className="section-title">✚ 조난자 상태</div>
+                <div className="section-title">
+                  ✚ {casualtyInfo[game.casualtyType].name}
+                </div>
                 <strong
                   className={game.found && game.health < 30 ? "orange" : ""}
                 >
@@ -599,7 +676,7 @@ export default function App() {
                 {game.clues.length ? (
                   game.clues.map((c, i) => (
                     <article key={i}>
-                      <small>{point(c.location).name}</small>
+                      <small>{point(c.location, game.mission).name}</small>
                       <p>{c.text}</p>
                     </article>
                   ))
@@ -660,7 +737,7 @@ export default function App() {
                   className="primary wide"
                   onClick={() => setFoundOpen(false)}
                 >
-                  확인 · 응급처치 준비
+                  무전 건너뛰기 · 구조 계속
                 </button>
               </section>
             </div>
@@ -718,8 +795,27 @@ export default function App() {
                   작전 시드 {game.seed} ·{" "}
                   {game.status === "failed"
                     ? "다음 출동에서는 단서를 먼저 확인하고 귀환 시간을 확보하세요."
-                    : "기록이 이 브라우저에 저장됩니다."}
+                    : game.practice
+                      ? "훈련 모드는 기록과 경험치를 저장하지 않습니다."
+                      : "기록이 이 브라우저에 저장됩니다."}
                 </small>
+                <p className="evaluation-rule">
+                  {evaluationRules[game.mission]}
+                </p>
+                <strong className="orange">
+                  획득 경험치 +{earnedXp(game)}
+                  {game.practice ? " · 훈련 모드" : ""}
+                </strong>
+                {game.routeReport.length > 0 && (
+                  <details className="route-report">
+                    <summary>
+                      경로 선택 결과 {game.routeReport.length}건
+                    </summary>
+                    {game.routeReport.map((r, i) => (
+                      <p key={i}>{r}</p>
+                    ))}
+                  </details>
+                )}
                 <div className="stars" aria-label={`${stars(game)}점 평가`}>
                   {"★".repeat(stars(game))}
                   <span>{"☆".repeat(3 - stars(game))}</span>
@@ -761,7 +857,7 @@ export default function App() {
           <button className="text-button" onClick={() => setScreen("menu")}>
             메인 메뉴로
           </button>
-          <span className="eyebrow orange">백운산 산악구조대</span>
+          <span className="eyebrow orange">통합 산악구조대</span>
           <h1>
             {screen === "records"
               ? "구조 기록"
@@ -771,7 +867,7 @@ export default function App() {
           </h1>
           {screen === "records" && (
             <div className="record-summary">
-              {([1, 2] as const).map((id) => {
+              {missionIds.map((id) => {
                 const stats = missionStats(records, id);
                 return (
                   <section className="panel" key={id}>
@@ -886,6 +982,19 @@ export default function App() {
                   checked={settings.motion}
                   onChange={(e) =>
                     setSettings({ ...settings, motion: e.target.checked })
+                  }
+                />
+              </label>
+              <label>
+                <span>
+                  <strong>발견 대화 건너뛰기</strong>
+                  <small>무전은 기록에 남기고 작전을 계속합니다.</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={!!settings.skipDialogue}
+                  onChange={(e) =>
+                    setSettings({ ...settings, skipDialogue: e.target.checked })
                   }
                 />
               </label>

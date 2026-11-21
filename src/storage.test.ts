@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGame } from "./game";
+import { isUnlocked, readCareer, trainSkill } from "./storage";
 import {
   missionStats,
   readRecords,
@@ -17,6 +18,55 @@ describe("기록 저장 및 호환성", () => {
     });
   });
   afterEach(() => vi.unstubAllGlobals());
+  it("2단계 누적 기록의 해금과 경험치를 보존하며 3단계로 이전", () => {
+    data.set(
+      "summit-rescue.records.v1",
+      JSON.stringify({
+        version: 2,
+        records: [],
+        totals: {
+          1: {
+            completed: true,
+            wins: 2,
+            bestStars: 3,
+            bestTime: 128,
+            bestHealth: 85,
+          },
+          2: {
+            completed: true,
+            wins: 1,
+            bestStars: 2,
+            bestTime: 190,
+            bestHealth: 60,
+          },
+        },
+      }),
+    );
+    expect(isUnlocked(3)).toBe(true);
+    expect(isUnlocked(4)).toBe(false);
+    expect(readCareer().xp).toBe(300);
+    expect(trainSkill("search")).toBe(true);
+    expect(readCareer().xp).toBe(200);
+    expect(readCareer().skills.search).toBe(1);
+    expect(missionStats([], 2).wins).toBe(1);
+  });
+  it("성공 보상은 한 번만 지급하고 훈련은 저장하지 않음", () => {
+    const game = { ...createGame(0, 3), status: "success" as const };
+    saveRecord(game);
+    const xp = readCareer().xp;
+    saveRecord(game);
+    expect(readCareer().xp).toBe(xp);
+    saveRecord({ ...createGame(1, 4, [], undefined, true), status: "success" });
+    expect(readRecords()).toHaveLength(1);
+    expect(isUnlocked(5)).toBe(false);
+  });
+  it("3단계 성장과 기록이 다시 읽어도 유지", () => {
+    saveRecord({ ...createGame(2, 5), status: "success" });
+    expect(trainSkill("response")).toBe(true);
+    expect(readCareer().skills.response).toBe(1);
+    expect(readRecords()[0].mission).toBe(5);
+    expect(trainSkill("mountain")).toBe(false);
+  });
   it("새 버전의 저장·중복 방지·같은 시드 재출동 기록", () => {
     const a = { ...createGame(1), status: "success" as const, elapsed: 128 };
     expect(saveRecord(a)).toBe(true);

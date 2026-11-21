@@ -1,5 +1,18 @@
+import { useState } from "react";
+import { regionFor } from "./regions";
+import {
+  isUnlocked,
+  missionStats,
+  readRecords,
+  readCareer,
+  trainSkill,
+} from "./storage";
+import { skillInfo, upgradeCost } from "./progression";
 import {
   equipment,
+  missionIds,
+  recommendations,
+  evaluationRules,
   forecast,
   missions,
   schedule,
@@ -13,50 +26,139 @@ export function MissionSelect({
   onSelect,
   onBack,
 }: {
-  onSelect: (id: MissionId) => void;
+  onSelect: (id: MissionId, practice: boolean) => void;
   onBack: () => void;
 }) {
+  const [practice, setPractice] = useState(false),
+    [career, setCareer] = useState(readCareer),
+    [notice, setNotice] = useState("");
+  const records = readRecords();
   return (
-    <main className="page">
+    <main className="page mission-page">
       <button className="text-button" onClick={onBack}>
         메인 메뉴로
       </button>
-      <span className="eyebrow orange">구조대 출동 준비</span>
-      <h1>다음 구조 작전</h1>
-      <p className="page-lead">산의 상황은 달라져도, 우리의 목표는 같습니다.</p>
+      <span className="eyebrow orange">산마다 다른 판단, 같은 목표</span>
+      <h1>산악 구조 작전</h1>
+      <p className="page-lead">
+        안개 속에서는 정보를, 암릉에서는 경로를, 밤의 숲에서는 불빛을 읽으세요.
+      </p>
+      <section className="career-panel panel">
+        <div>
+          <h2>구조대 훈련</h2>
+          <strong className="orange">보유 경험치 {career.xp}</strong>
+          <p>성공 시 100 + 평가별 25 경험치. 각 능력은 최대 3단계입니다.</p>
+        </div>
+        <div className="skill-cards">
+          {skillInfo.map((s) => (
+            <div key={s.id}>
+              <strong>
+                {s.name} <span>{career.skills[s.id]} / 3</span>
+              </strong>
+              <p>{s.effect}</p>
+              <button
+                disabled={
+                  career.skills[s.id] >= 3 ||
+                  career.xp < upgradeCost(career.skills[s.id])
+                }
+                onClick={() => {
+                  if (trainSkill(s.id)) {
+                    setCareer(readCareer());
+                    setNotice(s.name + " 훈련 완료");
+                  } else
+                    setNotice(
+                      "훈련을 저장하지 못했습니다. 경험치와 브라우저 저장 설정을 확인하세요.",
+                    );
+                }}
+              >
+                {career.skills[s.id] >= 3
+                  ? "최고 단계"
+                  : upgradeCost(career.skills[s.id]) + " 경험치로 훈련"}
+              </button>
+            </div>
+          ))}
+        </div>
+        <span role="status">{notice}</span>
+      </section>
+      <label className="training-toggle">
+        <input
+          type="checkbox"
+          checked={practice}
+          onChange={(e) => setPractice(e.target.checked)}
+        />
+        <span>
+          훈련 모드 · 모든 임무 체험{" "}
+          <small>완료 기록과 경험치를 저장하지 않습니다.</small>
+        </span>
+      </label>
       <div className="mission-cards">
-        {([1, 2] as const).map((id) => (
-          <button
-            className={`mission-card mission-${id}`}
-            onClick={() => onSelect(id)}
-            key={id}
-          >
-            <div className="mission-art">
-              <span>{id === 1 ? "△" : "☂"}</span>
-              <div className="mini-mountains" />
-            </div>
-            <div className="mission-card-body">
-              <span className="eyebrow orange">
-                임무 {id.toString().padStart(2, "0")} ·{" "}
-                {missions[id].difficulty}
-              </span>
-              <h2>{missions[id].name}</h2>
-              <p>
-                {id === 1
-                  ? "흔적을 찾고, 첫 번째 생명을 구하세요."
-                  : "다가오는 폭풍. 장비와 경로가 귀환을 결정합니다."}
-              </p>
-              <div>
-                <span>제한 {missions[id].limit}분</span>
+        {missionIds.map((id) => {
+          const region = regionFor(id),
+            stats = missionStats(records, id),
+            locked = !isUnlocked(id) && !practice;
+          return (
+            <button
+              className={
+                "mission-card mission-" + id + " region-card-" + region.theme
+              }
+              key={id}
+              disabled={locked}
+              onClick={() => onSelect(id, practice)}
+            >
+              <div className="mission-art">
                 <span>
-                  {id === 1 ? "튜토리얼 · 맑음" : "기상 변화 · 선택 이벤트"}
+                  {id === 3
+                    ? "≋"
+                    : id === 4
+                      ? "△"
+                      : id === 5
+                        ? "☾"
+                        : id === 2
+                          ? "☂"
+                          : "△"}
                 </span>
+                <div className="mini-mountains" />
+                {id === 5 && <i className="cabin-light" />}
+                <b>{region.name}</b>
               </div>
-              <strong>구조 요청 확인</strong>
-            </div>
-          </button>
-        ))}
+              <div className="mission-card-body">
+                <span className="eyebrow orange">
+                  임무 {String(id).padStart(2, "0")} · {missions[id].difficulty}
+                </span>
+                <h2>{missions[id].name}</h2>
+                <p>{missions[id].subtitle}</p>
+                <small>{region.inspiration}</small>
+                <div>
+                  <span>제한 {missions[id].limit}분</span>
+                  <span>
+                    {weatherInfo[schedule(id)[0].weather].name}
+                    {id === 5 ? " · 야간" : ""}
+                  </span>
+                </div>
+                <p className="recommended">
+                  권장:{" "}
+                  {recommendations[id]
+                    .map((item) => equipment.find((e) => e.id === item)!.name)
+                    .join(" · ")}
+                </p>
+                <strong>
+                  {locked
+                    ? "이전 임무를 완료하면 열립니다"
+                    : stats.completed
+                      ? "완료 · 최고 " + "★".repeat(stats.bestStars)
+                      : practice
+                        ? "훈련 출동 가능"
+                        : "첫 구조 작전 시작"}
+                </strong>
+              </div>
+            </button>
+          );
+        })}
       </div>
+      <p className="muted">
+        실제 산에서 영감을 받은 가상 지형입니다. 실제 등산로·구조 경로로
+        사용하지 마세요.
+      </p>
     </main>
   );
 }
@@ -86,7 +188,10 @@ export function Loadout({
         {mission === 1
           ? "첫 임무는 기본 응급처치만으로도 완료할 수 있습니다."
           : "빠른 계곡 길에는 로프, 늦은 귀환에는 방한포, 야간 수색에는 랜턴이 유리합니다."}{" "}
-        최대 3개를 선택하세요.
+        최대 3개를 선택하세요. 권장:{" "}
+        {recommendations[mission]
+          .map((id) => equipment.find((e) => e.id === id)!.name)
+          .join(" · ")}
       </p>
       <div className="loadout-grid">
         {equipment.map((item) => {
@@ -116,6 +221,7 @@ export function Loadout({
           );
         })}
       </div>
+      <p className="muted">평가 기준: {evaluationRules[mission]}</p>
       <label className="seed-input">
         작전 시드{" "}
         <input
@@ -131,7 +237,7 @@ export function Loadout({
         <span>같은 숫자는 같은 조난자 위치를 재현합니다.</span>
       </label>
       <div className="forecast-timeline">
-        {schedule(mission).map((p) => (
+        {schedule(mission, Number(seed) || 0).map((p) => (
           <span key={p.at}>
             <b>{p.at === 0 ? "출동" : `+${p.at}분`}</b>
             {weatherInfo[p.weather].icon} {weatherInfo[p.weather].name}
@@ -147,7 +253,7 @@ export function ForecastBar({ game }: { game: Game }) {
       className={`forecast-bar ${game.elapsed >= 70 && game.mission === 2 ? "warning" : ""}`}
     >
       <span>▥ 기상 예보</span>
-      <strong>{forecast(game.mission, game.elapsed)}</strong>
+      <strong>{forecast(game.mission, game.elapsed, game.seed)}</strong>
       <small>
         {game.elapsed >= missions[game.mission].sunset
           ? "야간 · 랜턴 없는 수색 +10분"

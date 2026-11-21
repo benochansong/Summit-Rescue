@@ -4,129 +4,23 @@ import {
   normalizeEquipment,
   weatherAt,
   weatherInfo,
+  missionType,
 } from "./conditions";
-import type { Equipment, MissionId } from "./conditions";
-export type Point = {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  elevation: number;
-  kind?: "base" | "shelter" | "lookout" | "cliff";
-};
-export const points: Point[] = [
-  {
-    id: "base",
-    name: "구조본부",
-    x: 175,
-    y: 665,
-    elevation: 320,
-    kind: "base",
-  },
-  { id: "gate", name: "북쪽 등산로", x: 290, y: 575, elevation: 410 },
-  {
-    id: "lookout",
-    name: "제2전망대",
-    x: 420,
-    y: 475,
-    elevation: 580,
-    kind: "lookout",
-  },
-  { id: "fork", name: "삼거리 이정표", x: 535, y: 370, elevation: 650 },
-  {
-    id: "cedar",
-    name: "전나무 쉼터",
-    x: 375,
-    y: 290,
-    elevation: 690,
-    kind: "shelter",
-  },
-  { id: "valley", name: "물소리 계곡", x: 670, y: 465, elevation: 520 },
-  {
-    id: "cave",
-    name: "바위 그늘",
-    x: 710,
-    y: 265,
-    elevation: 740,
-    kind: "cliff",
-  },
-  { id: "west", name: "서쪽 숲길", x: 150, y: 465, elevation: 460 },
-  { id: "spring", name: "옹달샘", x: 235, y: 345, elevation: 530 },
-  {
-    id: "hut",
-    name: "백운 대피소",
-    x: 210,
-    y: 225,
-    elevation: 640,
-    kind: "shelter",
-  },
-  {
-    id: "ridge",
-    name: "칼바람 능선",
-    x: 525,
-    y: 190,
-    elevation: 890,
-    kind: "cliff",
-  },
-  {
-    id: "summit",
-    name: "백운산 정상",
-    x: 650,
-    y: 95,
-    elevation: 1087,
-    kind: "lookout",
-  },
-  {
-    id: "east",
-    name: "동쪽 암릉",
-    x: 835,
-    y: 170,
-    elevation: 920,
-    kind: "cliff",
-  },
-  { id: "bridge", name: "계곡 나무다리", x: 770, y: 590, elevation: 400 },
-  { id: "pine", name: "소나무 숲", x: 525, y: 620, elevation: 400 },
-  { id: "lower", name: "하부 탐방로", x: 375, y: 705, elevation: 340 },
-  { id: "waterfall", name: "작은 폭포", x: 855, y: 405, elevation: 500 },
-];
-export type Edge = {
-  a: string;
-  b: string;
-  steep?: boolean;
-  risk?: "river" | "ridge";
-};
-export const edges: Edge[] = [
-  { a: "base", b: "gate" },
-  { a: "gate", b: "lookout" },
-  { a: "lookout", b: "fork" },
-  { a: "fork", b: "cedar" },
-  { a: "fork", b: "valley", risk: "river" },
-  { a: "fork", b: "cave", risk: "ridge" },
-  { a: "base", b: "west" },
-  { a: "west", b: "spring" },
-  { a: "spring", b: "hut" },
-  { a: "hut", b: "cedar" },
-  { a: "spring", b: "lookout" },
-  { a: "cedar", b: "ridge", steep: true, risk: "ridge" },
-  { a: "ridge", b: "summit", steep: true, risk: "ridge" },
-  { a: "summit", b: "east", steep: true, risk: "ridge" },
-  { a: "east", b: "cave", steep: true },
-  { a: "base", b: "lower" },
-  { a: "lower", b: "pine" },
-  { a: "pine", b: "lookout" },
-  { a: "pine", b: "bridge" },
-  { a: "bridge", b: "valley" },
-  { a: "valley", b: "waterfall" },
-  { a: "waterfall", b: "cave" },
-];
-export const candidates = ["cedar", "valley", "cave"];
-export const point = (id: string) => points.find((p) => p.id === id)!;
-export const connection = (a: string, b: string) =>
-  edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
-export const adjacent = (id: string) =>
-  edges
-    .filter((e) => e.a === id || e.b === id)
-    .map((e) => (e.a === id ? e.b : e.a));
+import type { CasualtyType, Equipment, MissionId } from "./conditions";
+import {
+  regionFor,
+  point,
+  connection,
+  adjacent,
+  graphDistance,
+} from "./regions";
+export { point, connection, adjacent } from "./regions";
+export const points = regionFor(1).points;
+export const edges = regionFor(1).edges;
+export const candidates = regionFor(1).candidates;
+import { normalizeSkills, zeroSkills } from "./progression";
+import type { SkillLevels } from "./progression";
+export type SignalReading = { location: string; strength: number };
 export type Clue = { location: string; text: string };
 export type Game = {
   seed: number;
@@ -154,10 +48,21 @@ export type Game = {
   pending: Encounter | null;
   resolved: string[];
   injury: number;
+  casualtyType: CasualtyType;
+  skills: SkillLevels;
+  practice: boolean;
+  readings: SignalReading[];
+  possible: string[];
+  shelterSecured: boolean;
+  lightSeen: boolean;
+  routeReport: string[];
 };
 export type Action =
   | { type: "move"; to: string }
   | { type: "search" }
+  | { type: "scan" }
+  | { type: "shelter" }
+  | { type: "wait" }
   | { type: "rest" }
   | { type: "aid" }
   | { type: "abandon" }
@@ -204,15 +109,17 @@ export function createGame(
   seed = Date.now(),
   mission: MissionId = 1,
   items: Equipment[] = ["kit", "blanket", "rope"],
+  skills: SkillLevels = zeroSkills(),
+  practice = false,
 ): Game {
   seed = seed >>> 0;
   return {
     seed,
-    target: candidates[(seed >>> 0) % 3],
+    target: regionFor(mission).candidates[seed % 3],
     position: "base",
     elapsed: 0,
     stamina: 100,
-    health: 85,
+    health: mission === 4 ? 80 : mission === 5 ? 90 : 85,
     found: false,
     treated: false,
     visited: ["base"],
@@ -220,8 +127,8 @@ export function createGame(
     trail: ["base"],
     clues: [],
     log: [
-      `본부 기상 예보: ${forecast(mission, 0)}`,
-      "본부: 제2전망대가 마지막 목격 장소입니다. 북쪽 등산로를 따라 이동하십시오.",
+      `본부 기상 예보: ${forecast(mission, 0, seed)}`,
+      `본부: ${regionFor(mission).briefing}`,
     ],
     status: "active",
     reason: "",
@@ -233,23 +140,41 @@ export function createGame(
     insulated: false,
     pending: null,
     resolved: [],
-    injury: mission === 2 ? 0.03 : 0,
+    injury: mission === 2 || mission === 4 ? 0.03 : 0,
+    casualtyType: missionType(mission),
+    skills: normalizeSkills(skills),
+    practice,
+    readings: [],
+    possible: [...regionFor(mission).candidates],
+    shelterSecured: false,
+    lightSeen: false,
+    routeReport: [],
     runId: crypto.randomUUID(),
   };
 }
 export function actionCost(g: Game, a: Action): Cost {
-  const weather = weatherAt(g.mission, g.elapsed);
+  const weather = weatherAt(g.mission, g.elapsed, g.seed);
   if (a.type === "move") {
-    const steep = connection(g.position, a.to)?.steep;
+    const edge = connection(g.position, a.to, g.mission);
+    const steep = edge?.steep;
     return {
       time: Math.ceil(
-        (steep ? 20 : 10) *
-          (g.found ? 1.2 : 1) *
+        Math.max(
+          4,
+          (edge?.time ?? (steep ? 20 : 10)) -
+            (steep ? g.skills.mountain * 2 : 0),
+        ) *
+          (g.found ? (g.casualtyType === "injured" ? 1.5 : 1.2) : 1) *
           (weather === "snow" ? 1.3 : 1),
       ),
       energy: Math.ceil(
-        ((steep ? 12 : 5) - (steep && g.equipment.includes("rope") ? 4 : 0)) *
-          (g.found ? 1.4 : 1) *
+        Math.max(
+          1,
+          (edge?.energy ?? (steep ? 12 : 5)) -
+            (steep && g.equipment.includes("rope") ? 4 : 0) -
+            (steep ? g.skills.mountain : 0),
+        ) *
+          (g.found ? (g.casualtyType === "injured" ? 1.6 : 1.4) : 1) *
           (weather === "rain" ? 1.3 : 1),
       ),
     };
@@ -257,15 +182,19 @@ export function actionCost(g: Game, a: Action): Cost {
   if (a.type === "search")
     return {
       time:
-        15 +
+        15 -
+        g.skills.search +
         (weather === "fog" ? 5 : 0) +
         (g.elapsed >= missions[g.mission].sunset &&
         !g.equipment.includes("lantern")
           ? 10
           : 0),
-      energy: 7,
+      energy: 7 - g.skills.search,
     };
   if (a.type === "rest") return { time: 20, energy: -15 };
+  if (a.type === "scan") return { time: g.mission === 3 ? 8 : 6, energy: 2 };
+  if (a.type === "shelter") return { time: 15, energy: -10 };
+  if (a.type === "wait") return { time: 10, energy: 0 };
   if (a.type === "aid" || a.type === "kit") return { time: 10, energy: 3 };
   if (a.type === "blanket") return { time: 5, energy: 1 };
   if (a.type === "drone") return { time: 8, energy: 2 };
@@ -278,14 +207,19 @@ export function actionCost(g: Game, a: Action): Cost {
     );
   return { time: 0, energy: 0 };
 }
-function safePath(from: string, to: string): string[] | undefined {
+function safePath(
+  from: string,
+  to: string,
+  mission: MissionId,
+): string[] | undefined {
   const queue = [{ at: from, path: [] as string[] }],
     seen = new Set([from]);
   while (queue.length) {
     const current = queue.shift()!;
     if (current.at === to) return current.path;
-    for (const next of adjacent(current.at)) {
-      if (seen.has(next) || connection(current.at, next)?.risk) continue;
+    for (const next of adjacent(current.at, mission)) {
+      if (seen.has(next) || connection(current.at, next, mission)?.risk)
+        continue;
       seen.add(next);
       queue.push({ at: next, path: [...current.path, next] });
     }
@@ -356,13 +290,13 @@ export function choicesFor(g: Game): Choice[] {
       },
     ];
   const base = actionCost(g, { type: "move", to: e.to! }),
-    path = safePath(g.position, e.to!);
+    path = safePath(g.position, e.to!, g.mission);
   const detour: Choice[] = path
     ? [
         {
           id: "detour",
           label: "안전한 숲길 우회",
-          detail: path.map((id) => point(id).name).join(" · "),
+          detail: path.map((id) => point(id, g.mission).name).join(" · "),
           cost: pathCost(g, path),
           path,
         },
@@ -406,7 +340,7 @@ export function choiceDisabled(g: Game, c: Choice): string {
   if (c.id === "kit" && g.kitUses >= 2) return "응급키트 소진";
   if (
     c.id === "drone" &&
-    (g.droneUses >= 2 || weatherAt(g.mission, g.elapsed) === "wind")
+    (g.droneUses >= 2 || weatherAt(g.mission, g.elapsed, g.seed) === "wind")
   )
     return "드론 소진 또는 강풍으로 비행 불가";
   if (g.stamina < c.cost.energy)
@@ -422,8 +356,39 @@ export function disabledReason(g: Game, a: Action): string {
     const c = choicesFor(g).find((c) => c.id === a.choice);
     return c ? choiceDisabled(g, c) : "선택할 수 없는 대응입니다.";
   }
-  if (a.type === "move" && !connection(g.position, a.to))
+  if (a.type === "move" && !connection(g.position, a.to, g.mission))
     return "연결된 등산로로만 이동할 수 있습니다.";
+  if (
+    a.type === "move" &&
+    g.casualtyType === "injured" &&
+    g.found &&
+    !g.treated
+  )
+    return "다친 조난자를 기본 응급처치한 뒤 이동하세요.";
+  if (
+    a.type === "move" &&
+    connection(g.position, a.to, g.mission)?.ropeOnlyInWind &&
+    weatherAt(g.mission, g.elapsed, g.seed) === "wind" &&
+    !g.equipment.includes("rope")
+  )
+    return "강풍으로 통행 제한: 구조 로프를 준비하거나 안전한 우회로를 선택하세요.";
+  if (a.type === "scan") {
+    if (g.mission !== 3 && g.mission !== 5)
+      return "이 임무에는 신호 분석이 없습니다.";
+    if (g.found) return "이미 조난자를 발견했습니다.";
+    if (g.readings.some((r) => r.location === g.position))
+      return "이 지점은 분석했습니다. 다른 위치의 신호와 비교하세요.";
+    if (g.mission === 5 && !lightActive(g))
+      return "지금은 불빛이 보이지 않습니다. 일몰 이후 15분씩 점멸합니다. 10분 대기하거나 이동하세요.";
+  }
+  if (
+    a.type === "shelter" &&
+    (g.mission !== 5 ||
+      !g.found ||
+      point(g.position, g.mission).kind !== "shelter" ||
+      g.shelterSecured)
+  )
+    return "조난자와 대피소에 도착하면 한 번 보온 정비할 수 있습니다.";
   if (a.type === "search" && g.searched.includes(g.position))
     return "이미 수색을 마쳤습니다.";
   if (a.type === "aid" && (!g.found || g.treated))
@@ -443,7 +408,7 @@ export function disabledReason(g: Game, a: Action): string {
     a.type === "drone" &&
     (!g.equipment.includes("drone") ||
       g.droneUses >= 2 ||
-      weatherAt(g.mission, g.elapsed) === "wind" ||
+      weatherAt(g.mission, g.elapsed, g.seed) === "wind" ||
       g.found)
   )
     return "발견 전 2회 사용 가능하며 강풍에서는 비행할 수 없습니다.";
@@ -455,15 +420,17 @@ export function disabledReason(g: Game, a: Action): string {
 export function advance(g: Game, cost: Cost): Game {
   let loss = 0;
   for (let i = 0; i < cost.time; i++) {
-    const weather = weatherAt(g.mission, g.elapsed + i);
+    const weather = weatherAt(g.mission, g.elapsed + i, g.seed);
     const exposure =
+      (g.casualtyType === "cold" ? 0.07 : 0) +
       (weather === "snow"
         ? 0.18
         : weather === "rain"
           ? 0.1
           : weather === "wind"
             ? 0.06
-            : 0) + (g.elapsed + i >= missions[g.mission].sunset ? 0.06 : 0);
+            : 0) +
+      (g.elapsed + i >= missions[g.mission].sunset ? 0.06 : 0);
     loss += 0.18 + g.injury + exposure * (g.insulated ? 0.45 : 1);
   }
   return {
@@ -474,14 +441,40 @@ export function advance(g: Game, cost: Cost): Game {
     revision: g.revision + 1,
   };
 }
+export const lightActive = (g: Game) =>
+  g.mission === 5 &&
+  g.elapsed >= missions[5].sunset &&
+  Math.floor(g.elapsed / 15) % 2 === 0;
+export const signalStrength = (
+  from: string,
+  target: string,
+  mission: MissionId,
+) => Math.max(0, 100 - graphDistance(from, target, mission) * 15);
+export function signalDirection(g: Game): string {
+  if (!lightActive(g) || g.found) return "";
+  const from = point(g.position, g.mission),
+    target = point(g.target, g.mission);
+  return (
+    `${Math.abs(target.y - from.y) > 40 ? (target.y < from.y ? "북" : "남") : ""}${Math.abs(target.x - from.x) > 40 ? (target.x < from.x ? "서" : "동") : ""}` ||
+    "현재 위치"
+  );
+}
+export const moveHealthCost = (g: Game, to: string) =>
+  g.found && g.mission === 4 && connection(g.position, to, g.mission)?.risk
+    ? g.equipment.includes("rope")
+      ? 0
+      : 6
+    : 0;
+const rescueReady = (g: Game) =>
+  g.position === "base" && g.found && (g.mission !== 5 || g.shelterSecured);
 function droneClue(g: Game): string {
   const nearby = new Set([
     g.position,
-    ...adjacent(g.position),
-    ...adjacent(g.position).flatMap(adjacent),
+    ...adjacent(g.position, g.mission),
+    ...adjacent(g.position, g.mission).flatMap((id) => adjacent(id, g.mission)),
   ]);
   return nearby.has(g.target)
-    ? `드론 열원 탐지: ${point(g.target).name}에서 사람의 흔적을 확인했습니다. 현장 수색이 필요합니다.`
+    ? `드론 열원 탐지: ${point(g.target, g.mission).name}에서 사람의 흔적을 확인했습니다. 현장 수색이 필요합니다.`
     : "드론 수색 범위(2구간) 내 열원이 없습니다. 제2전망대의 이동 기록을 확인하세요.";
 }
 export function transition(
@@ -500,8 +493,8 @@ export function transition(
   if (a.type === "choose" && a.choice === "cancel")
     return { ...g, pending: null, revision: g.revision + 1 };
   if (a.type === "move" && g.mission === 2) {
-    const risk = connection(g.position, a.to)?.risk,
-      weather = weatherAt(g.mission, g.elapsed);
+    const risk = connection(g.position, a.to, g.mission)?.risk,
+      weather = weatherAt(g.mission, g.elapsed, g.seed);
     const key = `${g.position}>${a.to}:${risk}`;
     if (
       ((risk === "river" && weather === "rain") ||
@@ -521,7 +514,17 @@ export function transition(
     n.position = a.to;
     n.visited = [...new Set([...g.visited, a.to])];
     n.trail = [...g.trail, a.to];
-    message = `${point(a.to).name} 도착. ${cost.time}분 경과, 체력 ${cost.energy} 소모.`;
+    message = `${point(a.to, g.mission).name} 도착. ${cost.time}분 경과, 체력 ${cost.energy} 소모.`;
+    const damage = moveHealthCost(g, a.to);
+    n.health = Math.max(0, n.health - damage);
+    if (g.mission === 4) {
+      const risky = !!connection(g.position, a.to, g.mission)?.risk;
+      n.routeReport = [
+        ...g.routeReport,
+        `${risky ? "노출 암릉" : "안전 경로"}: ${point(g.position, g.mission).name} → ${point(a.to, g.mission).name}${damage ? ` · 조난자 상태 −${damage}` : ""}`,
+      ];
+      if (damage) message += ` 부상자 상태 ${damage} 감소.`;
+    }
   }
   if (a.type === "search") {
     n.searched = [...g.searched, g.position];
@@ -529,16 +532,43 @@ export function transition(
       n.found = true;
       message =
         "본부, 여기는 구조 1팀. 실종자 발견! 생존 확인, 응급처치를 시작하겠습니다.";
+    } else if (g.mission >= 3) {
+      let text = "새로운 흔적은 없습니다. 수신 기록과 후보 구역을 비교하세요.";
+      if (g.mission === 3) {
+        if (g.position === regionFor(g.mission).initialHint)
+          text =
+            "서쪽 메아리 바위 방향에 오래된 발자국. 신고 시각과 일치하지 않아 조난자의 흔적인지는 미확인입니다. 무전 신호를 두 지점 이상 비교하세요.";
+        else if (g.position === "echo")
+          text =
+            "발자국은 오래된 순찰 흔적으로 확인되었습니다. 이 흔적만으로 수색 방향을 정하지 말고 무전 신호를 비교하세요.";
+        else if (g.position === "fork") {
+          const terrain =
+            g.target === "stream"
+              ? "흐르는 물"
+              : g.target === "grove"
+                ? "넓은 이끼 암반"
+                : "움푹한 북쪽 골짜기";
+          text = `재수신된 무전: 주변에 ${terrain}이 보인다고 합니다. 지형과 신호를 함께 비교하세요.`;
+        }
+      } else if (g.mission === 4 && g.position === "lookout")
+        text = `신고 좌표 확인: ${point(g.target, g.mission).name}. 부상으로 이동이 어렵습니다. 응급처치와 안전한 귀환 경로를 준비하세요.`;
+      else if (g.mission === 5 && g.position === "hut") {
+        const excluded = regionFor(5).candidates[((g.seed % 3) + 1) % 3];
+        n.possible = g.possible.filter((id) => id !== excluded);
+        text = `숙박 기록 확인: ${point(excluded, 5).name}은 순찰을 마쳤습니다. 남은 두 후보에서 간헐적인 불빛을 확인하세요. 대피소 불빛이 귀환의 기준점입니다.`;
+      }
+      n.clues = [...g.clues, { location: g.position, text }];
+      message = text;
     } else {
       const text =
         g.position === "lookout"
-          ? `떨어진 물병과 이동 기록 발견. 삼거리 이정표에서 ${point(g.target).name} 방향으로 향했습니다.`
+          ? `떨어진 물병과 이동 기록 발견. 삼거리 이정표에서 ${point(g.target, g.mission).name} 방향으로 향했습니다.`
           : g.position === "fork"
-            ? `등산화 발자국과 배낭을 확인했습니다. ${point(g.target).name}에서 수색하십시오.`
+            ? `등산화 발자국과 배낭을 확인했습니다. ${point(g.target, g.mission).name}에서 수색하십시오.`
             : g.position === "gate"
               ? "마지막 목격 정보: 제2전망대로 향하는 등산객을 봤습니다."
-              : adjacent(g.position).includes(g.target)
-                ? `가까운 ${point(g.target).name} 쪽에서 희미한 구조 신호가 들립니다.`
+              : adjacent(g.position, g.mission).includes(g.target)
+                ? `가까운 ${point(g.target, g.mission).name} 쪽에서 희미한 구조 신호가 들립니다.`
                 : "주변 수색 완료. 새로운 흔적이 없습니다. 마지막 목격 장소의 단서를 확인하세요.";
       if (!text.startsWith("주변"))
         n.clues = [...g.clues, { location: g.position, text }];
@@ -547,12 +577,36 @@ export function transition(
   }
   if (a.type === "rest")
     message = `20분 휴식. 체력 ${n.stamina - g.stamina} 회복.`;
+  if (a.type === "wait")
+    message = "10분 대기. 기상과 구조 신호의 변화를 확인하십시오.";
+  if (a.type === "scan") {
+    const strength = signalStrength(g.position, g.target, g.mission);
+    n.readings = [...g.readings, { location: g.position, strength }];
+    n.possible = g.possible.filter(
+      (id) => signalStrength(g.position, id, g.mission) === strength,
+    );
+    n.lightSeen = g.mission === 5 || g.lightSeen;
+    const text = `${g.mission === 3 ? "무전" : "불빛"} 신호 ${strength}/100. ${n.readings.length}개 지점 비교: 후보 ${n.possible.length}곳. ${n.possible.map((id) => point(id, g.mission).name).join(" · ")}`;
+    n.clues = [...g.clues, { location: g.position, text }];
+    message = text;
+  }
+  if (a.type === "shelter") {
+    n.shelterSecured = true;
+    n.insulated = true;
+    if (n.health > 0) n.health = Math.min(100, n.health + 12);
+    message =
+      "대피소 보온 정비 완료. 상태 최대 12·체력 최대 10 회복. 귀환 경로를 확보했습니다.";
+    n.routeReport = [
+      ...n.routeReport,
+      `${point(g.position, g.mission).name} 보온 후 본부 귀환`,
+    ];
+  }
   if (a.type === "aid") {
     n.treated = true;
     n.injury = 0;
-    if (n.health > 0) n.health = Math.min(100, n.health + 22);
-    message =
-      "기본 응급처치 완료. 상태 최대 22 회복, 부상 악화 완화. 구조본부로 귀환하십시오.";
+    if (n.health > 0)
+      n.health = Math.min(100, n.health + 22 + g.skills.response * 3);
+    message = `기본 응급처치 완료. 상태 최대 ${22 + g.skills.response * 3} 회복, 부상 악화 완화. 귀환 목표를 확인하십시오.`;
   }
   if (a.type === "kit") {
     n.kitUses++;
@@ -573,6 +627,7 @@ export function transition(
     const c = choicesFor(g).find((c) => c.id === a.choice)!;
     n.pending = null;
     n.resolved = [...g.resolved, g.pending!.key];
+    n.routeReport = [...g.routeReport, c.label];
     if (c.path) {
       n.position = c.path.at(-1)!;
       n.visited = [...new Set([...g.visited, ...c.path])];
@@ -587,7 +642,7 @@ export function transition(
       const text =
         c.id === "drone"
           ? droneClue(g)
-          : `구조 신호 방향 확인: ${point(g.target).name}에서 호루라기 소리가 납니다.`;
+          : `구조 신호 방향 확인: ${point(g.target, g.mission).name}에서 호루라기 소리가 납니다.`;
       n.clues = [...n.clues, { location: g.position, text }];
     }
     message = `${c.label}. ${cost.time}분 경과, 체력 ${cost.energy} 소모.${c.health ? ` 생존 상태 ${c.health > 0 ? "+" : ""}${c.health}.` : ""}${c.clue ? " 새 단서를 확인하세요." : ""}`;
@@ -595,17 +650,23 @@ export function transition(
   if (
     n.elapsed > missions[n.mission].limit ||
     n.health <= 0 ||
-    (n.elapsed === missions[n.mission].limit &&
-      !(n.position === "base" && n.found))
+    (n.elapsed === missions[n.mission].limit && !rescueReady(n))
   ) {
     n.status = "failed";
     n.reason =
       n.health <= 0
         ? "조난자의 생존 상태가 0에 도달했습니다."
         : "구조 제한 시간이 지났습니다.";
-  } else if (n.position === "base" && n.found) {
+  } else if (rescueReady(n)) {
     n.status = "success";
-    n.reason = "전원 무사 귀환. 오늘, 한 사람의 내일을 지켰습니다.";
+    n.reason =
+      n.mission === 3
+        ? "안개 속 신호가 한 사람의 귀환으로 이어졌습니다."
+        : n.mission === 4
+          ? "험한 암릉을 넘어, 부상자와 전원 무사 귀환."
+          : n.mission === 5
+            ? "마지막 불빛을 놓치지 않았습니다. 따뜻한 본부로 귀환 완료."
+            : "전원 무사 귀환. 오늘, 한 사람의 내일을 지켰습니다.";
   }
   if (n.status === "active" && n.mission === 2 && !n.pending) {
     if (
@@ -622,25 +683,47 @@ export function transition(
     )
       n.pending = { kind: "signal", key: "signal" };
   }
-  const beforeWeather = weatherAt(g.mission, g.elapsed),
-    afterWeather = weatherAt(n.mission, n.elapsed);
+  const beforeWeather = weatherAt(g.mission, g.elapsed, g.seed),
+    afterWeather = weatherAt(n.mission, n.elapsed, n.seed);
   const weatherLog =
     beforeWeather !== afterWeather
       ? [
-          `본부: ${weatherInfo[afterWeather].name} 관측. ${forecast(n.mission, n.elapsed)}`,
+          `본부: ${weatherInfo[afterWeather].name} 관측. ${forecast(n.mission, n.elapsed, n.seed)}`,
         ]
       : [];
   n.log = [message, ...weatherLog, ...g.log].slice(0, 30);
   return n;
 }
-export const stars = (g: Game) =>
-  g.status !== "success"
-    ? 1
-    : g.health >= 65 && g.elapsed <= missions[g.mission].limit * 0.9
+export const stars = (g: Game): number => {
+  if (g.status !== "success") return 1;
+  if (g.mission === 3)
+    return g.readings.length >= 2 && g.possible.length === 1 && g.health >= 55
       ? 3
-      : g.health >= 40
+      : g.readings.length >= 1 && g.health >= 35
         ? 2
         : 1;
+  if (g.mission === 4)
+    return g.treated &&
+      !g.routeReport.some((r) => r.includes("감수") || r.includes("상태 −")) &&
+      g.health >= 60
+      ? 3
+      : g.health >= 35
+        ? 2
+        : 1;
+  if (g.mission === 5)
+    return g.lightSeen && g.shelterSecured && g.health >= 55
+      ? 3
+      : g.health >= 35
+        ? 2
+        : 1;
+  return g.health >= 65 && g.elapsed <= missions[g.mission].limit * 0.9
+    ? 3
+    : g.health >= 40
+      ? 2
+      : 1;
+};
+export const earnedXp = (g: Game) =>
+  g.status === "success" && !g.practice ? 100 + stars(g) * 25 : 0;
 export const healthLabel = (health: number) =>
   health >= 80
     ? "안정"
@@ -651,11 +734,24 @@ export const healthLabel = (health: number) =>
         : health > 0
           ? "위급"
           : "구조 실패";
-export const objective = (g: Game) =>
-  g.found
-    ? g.treated
-      ? "조난자와 함께 구조본부로 귀환하세요."
-      : "응급처치로 조난자를 안정시키세요."
-    : g.clues.some((c) => c.text.includes(point(g.target).name))
-      ? `${point(g.target).name}에 도착해 주변을 수색하세요.`
-      : "북쪽 등산로를 따라 제2전망대에서 수색하세요.";
+export const objective = (g: Game): string => {
+  if (g.found) {
+    if (!g.treated) return "응급처치로 조난자를 안정시키세요.";
+    if (g.mission === 5 && !g.shelterSecured)
+      return "대피소에서 보온 정비 후 구조본부로 귀환하세요.";
+    return "조난자와 함께 구조본부로 귀환하세요.";
+  }
+  if ((g.mission === 3 || g.mission === 5) && g.possible.length === 1)
+    return point(g.possible[0], g.mission).name + "에서 주변을 수색하세요.";
+  if (g.mission === 3)
+    return g.readings.length < 2
+      ? "서로 다른 두 지점에서 무전 신호를 분석하세요."
+      : "다른 방향에서 신호를 비교해 남은 후보를 좁히세요.";
+  if (g.mission === 5)
+    return g.searched.includes("hut")
+      ? "불빛이 켜질 때 신호를 관측해 후보를 좁히세요."
+      : "첫빛 대피소에서 기록을 수색하세요.";
+  if (g.clues.some((c) => c.text.includes(point(g.target, g.mission).name)))
+    return point(g.target, g.mission).name + "에 도착해 주변을 수색하세요.";
+  return regionFor(g.mission).briefing;
+};
