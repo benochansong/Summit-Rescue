@@ -1,3 +1,4 @@
+import { decayHealth, singleSubject } from "./casualties";
 import {
   forecast,
   missions,
@@ -418,26 +419,23 @@ export function disabledReason(g: Game, a: Action): string {
 }
 // Every timed action uses this single integration point, including weather boundaries.
 export function advance(g: Game, cost: Cost): Game {
-  let loss = 0;
+  const subject = singleSubject(g);
+  let health = subject.health;
   for (let i = 0; i < cost.time; i++) {
-    const weather = weatherAt(g.mission, g.elapsed + i, g.seed);
-    const exposure =
-      (g.casualtyType === "cold" ? 0.07 : 0) +
-      (weather === "snow"
-        ? 0.18
-        : weather === "rain"
-          ? 0.1
-          : weather === "wind"
-            ? 0.06
-            : 0) +
-      (g.elapsed + i >= missions[g.mission].sunset ? 0.06 : 0);
-    loss += 0.18 + g.injury + exposure * (g.insulated ? 0.45 : 1);
+    health = decayHealth(
+      health,
+      0.18 + g.injury,
+      weatherAt(g.mission, g.elapsed + i, g.seed),
+      g.elapsed + i >= missions[g.mission].sunset,
+      subject.insulated,
+      subject.type === "cold",
+    );
   }
   return {
     ...g,
     elapsed: g.elapsed + cost.time,
     stamina: Math.min(100, Math.max(0, g.stamina - cost.energy)),
-    health: Math.max(0, g.health - loss),
+    health,
     revision: g.revision + 1,
   };
 }

@@ -1,3 +1,12 @@
+import {
+  commandStars,
+  commandXp,
+  grade,
+  rescuedCount,
+  safeCrew,
+  type CommandGame,
+} from "./command";
+import { crew, type MemberId } from "./commandData";
 import { missionIds } from "./conditions";
 import { normalizeSkills, train, zeroSkills } from "./progression";
 import type { Career, Skill } from "./progression";
@@ -15,6 +24,10 @@ export type RecordEntry = {
   date: string;
   xp?: number;
   routes?: string[];
+  grade?: "S" | "A" | "B" | "C";
+  rescued?: number;
+  droneUses?: number;
+  heliUses?: number;
 };
 export type MissionStats = {
   completed: boolean;
@@ -24,7 +37,8 @@ export type MissionStats = {
   bestHealth: number;
 };
 type Store = {
-  version: 3;
+  version: 4;
+  command: CommandCareer;
   career: Career;
   records: RecordEntry[];
   totals: Record<string, MissionStats>;
@@ -72,6 +86,7 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
     "3": emptyStats(),
     "4": emptyStats(),
     "5": emptyStats(),
+    "6": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -86,7 +101,7 @@ function readStore(): Store {
         : [];
     const records = candidates.filter(validRecord).slice(0, 100);
     const totals = fromRecords(records);
-    if ((raw?.version === 2 || raw?.version === 3) && raw?.totals)
+    if ([2, 3, 4].includes(raw?.version) && raw?.totals)
       for (const id of missionIds) {
         const s = raw.totals[id];
         if (
@@ -108,16 +123,23 @@ function readStore(): Store {
       0,
     );
     const career: Career =
-      raw?.version === 3 && raw?.career
+      [3, 4].includes(raw?.version) && raw?.career
         ? {
             xp: Math.max(0, Number.isFinite(raw.career.xp) ? raw.career.xp : 0),
             skills: normalizeSkills(raw.career.skills),
           }
         : { xp: legacyXp, skills: zeroSkills() };
-    return { version: 3, records, totals, career };
+    return {
+      version: 4,
+      records,
+      totals,
+      career,
+      command: normalizeCommandCareer(raw?.command),
+    };
   } catch {
     return {
-      version: 3,
+      version: 4,
+      command: normalizeCommandCareer(),
       records: [],
       totals: fromRecords([]),
       career: { xp: 0, skills: zeroSkills() },
@@ -214,5 +236,77 @@ export function saveSettings(s: Settings) {
     localStorage.setItem("summit-rescue.settings", JSON.stringify(s));
   } catch {
     /* Session settings still work. */
+  }
+}
+
+export type CommandCareer = {
+  xp: Record<MemberId, number>;
+  bestGrade: "S" | "A" | "B" | "C" | null;
+  rescued: number;
+  droneUses: number;
+  heliUses: number;
+};
+function normalizeCommandCareer(raw?: Partial<CommandCareer>): CommandCareer {
+  const count = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v)
+      ? Math.max(0, Math.floor(v))
+      : 0;
+  return {
+    xp: Object.fromEntries(
+      crew.map((m) => [m.id, count(raw?.xp?.[m.id])]),
+    ) as Record<MemberId, number>,
+    bestGrade:
+      raw?.bestGrade && ["S", "A", "B", "C"].includes(raw.bestGrade)
+        ? raw.bestGrade
+        : null,
+    rescued: count(raw?.rescued),
+    droneUses: count(raw?.droneUses),
+    heliUses: count(raw?.heliUses),
+  };
+}
+export function readCommandCareer(): CommandCareer {
+  return readStore().command;
+}
+export function saveCommandRecord(g: CommandGame): boolean {
+  if (g.status === "active" || !safeCrew(g)) return false;
+  if (g.practice) return true;
+  try {
+    const store = readStore();
+    if (store.records.some((r) => r.id === g.runId)) return true;
+    const rating = grade(g),
+      xp = commandXp(g);
+    const record: RecordEntry = {
+      id: g.runId,
+      mission: 6,
+      success: g.status === "success",
+      time: g.elapsed,
+      health: Math.round(Math.min(...g.subjects.map((s) => s.health))),
+      stamina: Math.round(Math.min(...g.members.map((m) => m.stamina))),
+      clues: g.clues.length,
+      stars: commandStars(g),
+      date: new Date().toLocaleDateString("ko-KR"),
+      xp,
+      grade: rating,
+      rescued: rescuedCount(g),
+      droneUses: g.drone.uses,
+      heliUses: g.heli.uses,
+      routes: g.members.map((m) => m.id + ": " + m.trail.join(" → ")),
+    };
+    store.records = [record, ...store.records].slice(0, 100);
+    store.totals[6] = addWin(store.totals[6], record);
+    store.career.xp += xp;
+    const c = store.command;
+    c.rescued += record.rescued!;
+    c.droneUses += g.drone.uses;
+    c.heliUses += g.heli.uses;
+    if (!c.bestGrade || "SABC".indexOf(rating) < "SABC".indexOf(c.bestGrade))
+      c.bestGrade = rating;
+    for (const m of g.members)
+      if (m.trail.length > 1 || m.intel.length)
+        c.xp[m.id] += Math.floor(xp / 2);
+    localStorage.setItem(KEY, JSON.stringify(store));
+    return true;
+  } catch {
+    return false;
   }
 }

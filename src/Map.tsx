@@ -1,3 +1,5 @@
+import { crew, landingZones } from "./commandData";
+import { activeOrder, type CommandGame } from "./command";
 import { memo, useEffect, useRef, useState } from "react";
 import { adjacent, point, regionFor } from "./regions";
 import { missions } from "./conditions";
@@ -39,6 +41,7 @@ export default function MountainMap({
   busy,
   weather = "clear",
   animate = true,
+  command,
 }: {
   game: Game;
   selected: string;
@@ -46,6 +49,7 @@ export default function MountainMap({
   busy: boolean;
   weather?: string;
   animate?: boolean;
+  command?: CommandGame;
 }) {
   const region = regionFor(game.mission),
     points = region.points,
@@ -442,22 +446,135 @@ export default function MountainMap({
             </g>
           );
         })}
-        <g
-          className="rescue-marker"
-          style={{
-            transform: `translate(${here.x}px, ${here.y}px)`,
-            transitionDuration: `${marker.duration}ms`,
-          }}
-          pointerEvents="none"
-        >
-          <circle r="17" fill="#f5a15b" opacity=".2" className="pulse" />
-          <path
-            d="M-8 -13L0 -25 8 -13 0 -16Z"
-            fill="#ffbe7e"
-            stroke="#242d26"
-            strokeWidth="2"
-          />
-        </g>
+        {!command && (
+          <g
+            className="rescue-marker"
+            style={{
+              transform: `translate(${here.x}px, ${here.y}px)`,
+              transitionDuration: `${marker.duration}ms`,
+            }}
+            pointerEvents="none"
+          >
+            <circle r="17" fill="#f5a15b" opacity=".2" className="pulse" />
+            <path
+              d="M-8 -13L0 -25 8 -13 0 -16Z"
+              fill="#ffbe7e"
+              stroke="#242d26"
+              strokeWidth="2"
+            />
+          </g>
+        )}
+
+        {command && (
+          <g pointerEvents="none" className="command-overlays">
+            {landingZones.map((id) => {
+              const p = mapPoint(id);
+              return (
+                <g key={id} transform={`translate(${p.x - 24} ${p.y - 25})`}>
+                  <circle r="10" fill="#152e31" stroke="#8bcbb2" />
+                  <text textAnchor="middle" y="4" fontSize="12" fill="#8bcbb2">
+                    H
+                  </text>
+                </g>
+              );
+            })}
+            {command.subjects
+              .filter((s) => s.found && s.status !== "rescued")
+              .map((s, i) => {
+                const p = mapPoint(s.position);
+                return (
+                  <g
+                    key={s.id}
+                    transform={`translate(${p.x + 22} ${p.y + 10 + i * 17})`}
+                  >
+                    <rect
+                      x="-9"
+                      y="-10"
+                      width="18"
+                      height="18"
+                      rx="3"
+                      fill={s.health > 0 ? "#ad5751" : "#536168"}
+                    />
+                    <text y="4" textAnchor="middle" fontSize="13" fill="white">
+                      +
+                    </text>
+                  </g>
+                );
+              })}
+            {command.orders
+              .filter((o) => o.to)
+              .map((o) => {
+                const a = mapPoint(o.origin),
+                  b = mapPoint(o.to!);
+                const color = crew.find((c) => c.id === o.members[0])!.color;
+                return (
+                  <g key={o.id}>
+                    <path
+                      d={`M${a.x} ${a.y} L${b.x} ${b.y}`}
+                      stroke={color}
+                      strokeWidth="3"
+                      strokeDasharray="7 7"
+                      opacity=".65"
+                    />
+                    {(o.kind === "drone" ||
+                      o.kind === "heliRecon" ||
+                      o.kind === "heliEvac") && (
+                      <g
+                        className="air-marker"
+                        transform={`translate(${b.x} ${b.y - 40})`}
+                      >
+                        <circle r="18" fill="#10282e" stroke="#c4dfd5" />
+                        <text
+                          y="5"
+                          textAnchor="middle"
+                          fill="#fff"
+                          fontSize="18"
+                        >
+                          {o.kind === "drone" ? "⌘" : "H"}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            {command.members.map((m, i) => {
+              const a = mapPoint(m.position),
+                o = activeOrder(command, m.id),
+                b =
+                  o?.to && (o.kind === "move" || o.kind === "return")
+                    ? mapPoint(o.to)
+                    : a;
+              const progress = o ? 1 - o.remaining / o.total : 0;
+              const c = crew[i];
+              return (
+                <g
+                  key={m.id}
+                  className="crew-map-marker"
+                  style={{
+                    transform: `translate(${a.x + (b.x - a.x) * progress + (i - 1) * 18}px, ${a.y + (b.y - a.y) * progress - 18}px)`,
+                  }}
+                >
+                  <circle
+                    r="10"
+                    fill={c.color}
+                    stroke="#122c30"
+                    strokeWidth="2"
+                  />
+                  <text
+                    y="4"
+                    textAnchor="middle"
+                    fontSize="11"
+                    fontWeight="900"
+                    fill="#132c2e"
+                  >
+                    {i + 1}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        )}
+
         <g transform={`scale(1 ${verticalScale})`}>
           {weather === "rain" && (
             <rect
