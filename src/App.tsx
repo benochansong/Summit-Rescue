@@ -299,7 +299,7 @@ export default function App() {
     beep("radio");
   }
   function start() {
-    if (mission === 7) {
+    if (mission >= 7) {
       setDisaster(
         createDisaster(
           Number(seedInput) >>> 0,
@@ -307,6 +307,7 @@ export default function App() {
           loadout,
           readCareer().skills,
           practice,
+          mission as 7 | 8,
         ),
       );
       setScreen("disaster");
@@ -498,7 +499,19 @@ export default function App() {
                   setScreen("briefing");
                 }}
               >
-                △ 신규 작전 · 폭풍 속 마지막 구조
+                △ 재난 작전 · 폭풍 속 마지막 구조
+              </button>
+              <button
+                className="disaster-start"
+                onClick={() => {
+                  setMission(8);
+                  setPractice(false);
+                  setLoadout([...recommendations[8]]);
+                  if (!seedInput.trim()) setSeedInput(String(Date.now() >>> 0));
+                  setScreen("briefing");
+                }}
+              >
+                ⌁ 신규 작전 · 절벽 아래의 구조 신호
               </button>
               <div className="menu-secondary">
                 <button onClick={() => setScreen("records")}>구조 기록</button>
@@ -529,7 +542,7 @@ export default function App() {
             setPractice(training);
             setLoadout([...recommendations[id]]);
             setMission(id);
-            if (id === 7 && !seedInput.trim())
+            if (id >= 7 && !seedInput.trim())
               setSeedInput(String(Date.now() >>> 0));
             setScreen("briefing");
           }}
@@ -558,7 +571,7 @@ export default function App() {
               onChange={setExperienceOptions}
             />
           )}
-          {mission === 7 && (
+          {mission >= 7 && (
             <DisasterSetup
               value={disasterDifficulty}
               onChange={setDisasterDifficulty}
@@ -580,7 +593,7 @@ export default function App() {
                   <strong>
                     {mission === 1
                       ? difficulties[experienceOptions.difficulty].limit
-                      : mission === 7
+                      : mission >= 7
                         ? disasterProfiles[disasterDifficulty].limit
                         : briefingMission.limit}{" "}
                     <em>분</em>
@@ -597,7 +610,7 @@ export default function App() {
                   <strong>
                     {mission === 1
                       ? difficulties[experienceOptions.difficulty].name
-                      : mission === 7
+                      : mission >= 7
                         ? disasterProfiles[disasterDifficulty].name
                         : briefingMission.difficulty}
                   </strong>

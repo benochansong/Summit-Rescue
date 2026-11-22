@@ -1,3 +1,4 @@
+import CliffRescue from "./CliffRescue";
 import { useEffect, useRef, useState } from "react";
 import MountainMap from "./Map";
 import RescueActionPanel, { RescueIllustration } from "./RescueAction";
@@ -27,7 +28,7 @@ import {
   type DisasterGame,
 } from "./disaster";
 import { adjacent, point, regionFor } from "./regions";
-import { equipment, weatherInfo } from "./conditions";
+import { equipment, weatherInfo, missions } from "./conditions";
 import { personalHighlights, saveRecord, type Settings } from "./storage";
 import { RescueAudio } from "./audio";
 import type { Difficulty } from "./experience";
@@ -106,7 +107,12 @@ export default function DisasterScreen({
     ),
     times = disasterTimes(game.difficulty, game.seed);
   const scene = game.scenes[0],
-    modal = !!scene || !!game.action || game.status !== "active" || aborting;
+    modal =
+      !!scene ||
+      !!game.cliff?.visible ||
+      !!game.action ||
+      game.status !== "active" ||
+      aborting;
   useEffect(() => {
     sound.current ??= new RescueAudio();
     sound.current.configure(settings);
@@ -181,35 +187,41 @@ export default function DisasterScreen({
     setNotice("");
     setGame(next);
     const event = next.scenes[0];
+    const cliffMiss = a.type === "cliff" && next.cliff?.feedback === "miss";
     sound.current?.play(
-      next.status === "success"
-        ? "success"
-        : next.status === "failed"
-          ? "failure"
-          : event === "rock"
-            ? "rock"
-            : event === "flood"
-              ? "flood"
-              : event === "storm"
-                ? "storm"
-                : event === "found"
-                  ? "found"
-                  : a.type === "helicopter"
-                    ? "helicopter"
-                    : a.type === "move"
-                      ? "move"
-                      : a.type === "rope"
-                        ? "rope"
-                        : a.type === "carry"
-                          ? "carry"
-                          : "radio",
+      cliffMiss
+        ? "risk"
+        : a.type === "cliff"
+          ? "rope"
+          : next.status === "success"
+            ? "success"
+            : next.status === "failed"
+              ? "failure"
+              : event === "rock"
+                ? "rock"
+                : event === "flood"
+                  ? "flood"
+                  : event === "storm"
+                    ? "storm"
+                    : event === "found"
+                      ? "found"
+                      : a.type === "helicopter"
+                        ? "helicopter"
+                        : a.type === "move"
+                          ? "move"
+                          : a.type === "rope"
+                            ? "rope"
+                            : a.type === "carry"
+                              ? "carry"
+                              : "radio",
     );
     if (next.status !== "active") {
       setHighlights(
         personalHighlights(next, disasterRating(next), next.difficulty),
       );
       if (
-        !saveRecord(next, 7, {
+        !saveRecord(next, next.mission, {
+          bonus: next.cliffResult?.bonus ?? 0,
           difficulty: next.difficulty,
           rating: disasterRating(next),
         })
@@ -240,6 +252,7 @@ export default function DisasterScreen({
       initial.equipment,
       initial.skills,
       initial.practice,
+      initial.mission as 7 | 8,
     );
     setGame(settings.skipDialogue ? { ...next, scenes: [] } : next);
     setSelected("gate");
@@ -281,7 +294,7 @@ export default function DisasterScreen({
       edgeState(game, game.position, selected),
     );
   const objective = disasterGoal(game),
-    clock = 14 * 60 + 10 + game.elapsed;
+    clock = missions[game.mission].start + game.elapsed;
   return (
     <div className={`app disaster-app ${settings.motion ? "" : "motion-off"}`}>
       <header className="brandbar">
@@ -317,9 +330,10 @@ export default function DisasterScreen({
         <div className="disaster-heading">
           <div>
             <span className="eyebrow orange">
-              작전 07 · {profile.name} {game.practice ? "· 훈련" : ""}
+              작전 {String(game.mission).padStart(2, "0")} · {profile.name}{" "}
+              {game.practice ? "· 훈련" : ""}
             </span>
-            <h1>폭풍 속 마지막 구조</h1>
+            <h1>{missions[game.mission].name}</h1>
           </div>
           <div className="disaster-hud">
             <span>
@@ -488,7 +502,9 @@ export default function DisasterScreen({
               </small>
             </section>
             <section className="panel field-actions">
-              <span className="eyebrow orange">구조 1팀 · 이재하 씨 수색</span>
+              <span className="eyebrow orange">
+                구조 1팀 · {game.mission === 8 ? "한서윤" : "이재하"} 씨 수색
+              </span>
               <h2>
                 {game.found
                   ? "발견 후에도, 함께 귀환까지"
@@ -501,9 +517,16 @@ export default function DisasterScreen({
               </p>
               <div className="field-buttons">
                 {control({ type: "start", kind: "signal" }, "신호 탐지")}
-                {control({ type: "start", kind: "rope" }, "로프 구조")}
+                {game.mission === 8
+                  ? game.cliff &&
+                    control(
+                      { type: "cliff", command: { type: "resume" } },
+                      "절벽 구조 계속",
+                    )
+                  : control({ type: "start", kind: "rope" }, "로프 구조")}
                 {control({ type: "aid" }, "응급처치")}
-                {control({ type: "start", kind: "carry" }, "부상자 이송")}
+                {game.mission !== 8 &&
+                  control({ type: "start", kind: "carry" }, "부상자 이송")}
                 {game.equipment.includes("kit") &&
                   control({ type: "kit" }, `응급키트 ${2 - game.kitUses}회`)}
                 {game.equipment.includes("blanket") &&
@@ -579,7 +602,8 @@ export default function DisasterScreen({
               <p>{game.reason}</p>
               {game.status === "success" ? (
                 <blockquote>
-                  “그 목소리를 듣고 버틸 수 있었어요.” 재하 씨가 구조대에 고개를
+                  “그 목소리를 듣고 버틸 수 있었어요.”{" "}
+                  {game.mission === 8 ? "서윤" : "재하"} 씨가 구조대에 고개를
                   숙입니다.
                 </blockquote>
               ) : (
@@ -615,6 +639,14 @@ export default function DisasterScreen({
                   <strong>+{disasterXp(game)}</strong>
                 </div>
               </div>
+              {game.cliffResult && (
+                <p>
+                  절벽 액션: {game.cliffResult.grade} · 실수{" "}
+                  {game.cliffResult.mistakes}회 · {game.cliffResult.time}분 /
+                  체력 {game.cliffResult.energy} · 안전 귀환 보너스{" "}
+                  {game.status === "success" ? game.cliffResult.bonus : 0}
+                </p>
+              )}
               <p>
                 발생 재난:{" "}
                 {game.events
@@ -694,10 +726,22 @@ export default function DisasterScreen({
               aria-modal="true"
               aria-labelledby="scene-title"
             >
-              <span className="eyebrow orange">{scenes[scene].eyebrow}</span>
+              <span className="eyebrow orange">
+                {game.mission === 8 && scene === "dispatch"
+                  ? "15:30 · 백운산 동쪽 암릉"
+                  : scenes[scene].eyebrow}
+              </span>
               <h2 id="scene-title">{scenes[scene].title}</h2>
               <RescueIllustration scene={scene} />
-              <p>{scenes[scene].text}</p>
+              <p>
+                {game.mission === 8 && scene === "dispatch"
+                  ? missions[8].description
+                  : game.mission === 8 && scene === "found"
+                    ? "절벽 아래 서윤 씨를 발견했습니다. 장비를 확인하고 로프를 안정시킨 뒤 하강하세요. 안전 인양 전까지 이동할 수 없습니다."
+                    : game.mission === 8 && scene === "secured"
+                      ? "서윤 씨를 안전 지형으로 인양했습니다. 기본 처치 후 본부로 함께 귀환하세요."
+                      : scenes[scene].text}
+              </p>
               <small>
                 현지 시각은 멈춰 있습니다. 지도를 확인한 뒤 결정하세요.
               </small>
@@ -709,6 +753,16 @@ export default function DisasterScreen({
                 상황 확인 · 연출 건너뛰기
               </button>
             </section>
+          ) : game.cliff?.visible ? (
+            <CliffRescue
+              game={game}
+              command={(command) => act({ type: "cliff", command })}
+              busy={busy}
+              motion={settings.motion}
+              onSound={() =>
+                onSettings({ ...settings, sound: !settings.sound })
+              }
+            />
           ) : game.action ? (
             <RescueActionPanel
               key={game.action.kind}
