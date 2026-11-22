@@ -9,6 +9,7 @@ describe("오디오 실패 격리와 음소거", () => {
     sound.configure({ sound: false, volume: 1 });
     sound.play("found");
     sound.scene("wind", 3, true);
+    sound.rotor(1);
     expect(constructor).not.toHaveBeenCalled();
   });
   it("지원되지 않는 오디오 API도 예외를 전파하지 않음", () => {
@@ -99,11 +100,30 @@ describe("오디오 실패 격리와 음소거", () => {
     expect(gains[0].gain.value).toBe(0.4);
     sound.scene("rain", 3, true, true);
     expect(gains[1].gain.setTargetAtTime).toHaveBeenCalledWith(0.015, 0, 0.3);
+    sound.rotor(1);
+    expect(oscillators).toHaveLength(4);
+    const rotorNodes = gains.slice(-2);
+    expect(rotorNodes[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(
+      0.08,
+      0,
+      0.7,
+    );
+    sound.rotor(0);
+    expect(rotorNodes[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(
+      0,
+      0,
+      0.7,
+    );
+    expect(rotorNodes[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(
+      0,
+      0,
+      0.7,
+    );
     sound.configure({ sound: false, volume: 0.4 });
     expect(gains[0].gain.setValueAtTime).toHaveBeenCalledWith(0, 0);
     expect(suspend).toHaveBeenCalled();
     sound.play("found");
-    expect(oscillators).toHaveLength(2);
+    expect(oscillators).toHaveLength(4);
     oscillators[0].onended!();
     expect(oscillators[0].disconnect).toHaveBeenCalled();
     sound.close();

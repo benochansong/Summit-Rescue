@@ -1,8 +1,8 @@
 export type Weather =
   "clear" | "cloudy" | "fog" | "drizzle" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
-export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
-export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 export type CasualtyType = "lost" | "injured" | "cold";
 export const casualtyInfo = {
   lost: { name: "길을 잃은 등산객", detail: "기본 동행 비용 · 정보 수색 중심" },
@@ -71,6 +71,16 @@ export const weatherInfo: Record<
   snow: { name: "폭설", icon: "❄", detail: "−4°C · 이동 시간 ×1.3" },
 };
 export const missions = {
+  9: {
+    name: "하늘에서 온 구조 요청",
+    subtitle: "하늘이 열리는 순간, 구조의 희망이 시작된다.",
+    limit: 400,
+    start: 16 * 60 + 20,
+    sunset: 90,
+    difficulty: "항공 구조",
+    description:
+      "16:20, 고산 능선에서 박도현 씨가 부상을 입었습니다. 전망대에서 신호를 확인하고 조난자를 찾아 처치하세요. +60분 강풍, +125분 비, +145분 흐림이 예보됩니다. 지상 귀환 또는 H 지점 항공 지원을 선택하십시오. 헬기는 조난자만 이송하며 구조팀은 별도로 본부에 복귀해야 합니다.",
+  },
   8: {
     name: "절벽 아래의 구조 신호",
     subtitle: "산은 위험하다. 하지만 구조는 멈추지 않는다.",
@@ -155,6 +165,7 @@ export const missions = {
 export const missionType = (id: MissionId): CasualtyType =>
   id === 4 ? "injured" : id === 5 ? "cold" : "lost";
 export const recommendations: Record<MissionId, Equipment[]> = {
+  9: ["rope", "kit", "blanket"],
   8: ["rope", "kit", "blanket"],
   7: ["rope", "kit", "blanket"],
   6: ["drone", "kit", "rope"],
@@ -165,6 +176,7 @@ export const recommendations: Record<MissionId, Equipment[]> = {
   5: ["lantern", "blanket", "kit"],
 };
 export const evaluationRules: Record<MissionId, string> = {
+  9: "지상·항공 동일 평가: 생존 60 이상·제한 시간85% 이내 3별, 생존35 이상2별. 조난자와 구조팀 모두 안전해야 성공.",
   8: "안전 귀환·생존·시간으로 별 평가. 정밀 수동 구조는 성공 귀환 시 경험치 +20, 안정 구조 +10. 자동 구조도 정상 완료.",
   7: "3별: 안전 인계·생존 60 이상·제한 시간 85% 이내 / 2별: 생존 35 이상 · 자동 구조도 같은 평가",
   6: "S: 2명 구조·대원 전원 안전·230분 이내·생존 50 이상 / A: 2명 구조·전원 안전 / B: 1명 구조 / C: 미달성",

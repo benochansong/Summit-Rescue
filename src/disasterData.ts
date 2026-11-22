@@ -44,11 +44,59 @@ export const disasterProfiles = {
   },
 } satisfies Record<Difficulty, object>;
 export type Scene =
-  "dispatch" | "rock" | "flood" | "storm" | "found" | "secured" | "helicopter";
+  | "air-request"
+  | "air-approach"
+  | "air-hoist"
+  | "air-depart"
+  | "air-complete"
+  | "air-delay"
+  | "air-return"
+  | "dispatch"
+  | "rock"
+  | "flood"
+  | "storm"
+  | "found"
+  | "secured"
+  | "helicopter";
 export const scenes: Record<
   Scene,
   { eyebrow: string; title: string; text: string }
 > = {
+  "air-request": {
+    eyebrow: "항공 지원",
+    title: "요청 접수",
+    text: "출동 요청을 확인합니다.",
+  },
+  "air-approach": {
+    eyebrow: "항공 지원",
+    title: "현장 접근",
+    text: "현장 기상을 확인합니다.",
+  },
+  "air-hoist": {
+    eyebrow: "항공 지원",
+    title: "구조 진행",
+    text: "조난자 인양 중입니다.",
+  },
+  "air-depart": {
+    eyebrow: "항공 지원",
+    title: "이송 중",
+    text: "조난자 탑승 완료.",
+  },
+  "air-complete": {
+    eyebrow: "항공 지원",
+    title: "안전 인계",
+    text: "구조팀 귀환을 확인합니다.",
+  },
+  "air-delay": {
+    eyebrow: "항공 지원",
+    title: "접근 지연",
+    text: "대기 또는 지상 전환.",
+  },
+  "air-return": {
+    eyebrow: "항공 지원",
+    title: "복귀",
+    text: "지상 작전을 계속하세요.",
+  },
   dispatch: {
     eyebrow: "14:10 · 백운산 구조본부",
     title: "마지막 무전이 끊겼습니다",
@@ -98,7 +146,20 @@ export function disasterTimes(difficulty: Difficulty, seed: number) {
 export function disasterSchedule(
   difficulty: Difficulty,
   seed: number,
+  mission = 7,
 ): { at: number; weather: Weather }[] {
+  if (mission === 9)
+    return [
+      { at: 0, weather: "clear" },
+      { at: 30, weather: "cloudy" },
+      { at: 60, weather: "wind" },
+      { at: 100, weather: "rain" },
+      { at: 125, weather: "drizzle" },
+      { at: 145, weather: "cloudy" },
+      { at: 220, weather: "fog" },
+      { at: 245, weather: "clear" },
+      { at: 360, weather: "snow" },
+    ];
   const p = disasterProfiles[difficulty],
     offset = (Math.floor((seed >>> 0) / 3) % 3) * 5;
   return [

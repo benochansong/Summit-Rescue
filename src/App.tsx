@@ -307,7 +307,7 @@ export default function App() {
           loadout,
           readCareer().skills,
           practice,
-          mission as 7 | 8,
+          mission as 7 | 8 | 9,
         ),
       );
       setScreen("disaster");
@@ -513,6 +513,18 @@ export default function App() {
               >
                 ⌁ 신규 작전 · 절벽 아래의 구조 신호
               </button>
+              <button
+                className="disaster-start"
+                onClick={() => {
+                  setMission(9);
+                  setPractice(false);
+                  setLoadout([...recommendations[9]]);
+                  if (!seedInput.trim()) setSeedInput(String(Date.now() >>> 0));
+                  setScreen("briefing");
+                }}
+              >
+                ✚ 항공 작전 · 하늘에서 온 구조 요청
+              </button>
               <div className="menu-secondary">
                 <button onClick={() => setScreen("records")}>구조 기록</button>
                 <button onClick={() => setScreen("help")}>게임 방법</button>
@@ -573,6 +585,7 @@ export default function App() {
           )}
           {mission >= 7 && (
             <DisasterSetup
+              mission={mission as 7 | 8 | 9}
               value={disasterDifficulty}
               onChange={setDisasterDifficulty}
             />

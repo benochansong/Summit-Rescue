@@ -254,3 +254,11 @@ Phase 6-B에서는 이미 있는 액션의 연출과 조작감을 발전시키�
 검증: 기존 2,146 + 신규 980 = **3,126개 테스트 통과**, TypeScript·프로덕션 빌드 통과. 새 작전은 108시드 × 3난이도 × 수동/자동/무장비 = 972회 귀환 성공입니다. 나머지 테스트는 비용, 속도, 날씨, 일시정지/복귀, 중복 확정, 실제 신호, 기존 저장 호환을 확인합니다.
 
 이번 단계의 브라우저 제어 도구는 탭 생성과 상태 조회 모두 시간 초과되어 **실제 브라우저 플레이·모바일 시각 검증을 완료하지 못했습니다**. 20~40초 로프 조작·15~30초 탐지·8~12분 전체 임무는 설계 목표이며 사람 플레이 측정 결과가 아닙니다. 음향 청취 품질도 미검증입니다. 기존 6-A 스크린샷은 6-B 검증 증거가 아닙니다.
+
+## Phase 6-C — Sky Rescue (0.6.2)
+
+Mission 09 adds one-use helicopter support to the shared minute-by-minute simulation. Request (2 min / 1 energy), preparation, flight, approach, hoist and transport take time; weather and the rescue team's presence are rechecked before boarding. Clear/cloudy conditions permit all four H sites; drizzle permits sheltered sites with longer flight. Strong wind, heavy rain, fog and snow delay approach, with automatic return after 30 minutes. Cancellation and retargeting do not refund the support use.
+
+Air transport secures the casualty only. The ground team must reach base separately before success. Once aboard, the casualty is protected and transport continues; local ground weather no longer interrupts that protected transfer. The panel compares support time and current ground-route costs. SVG helicopter scenes, optional rotor audio, skip controls and reduced motion derive from the engine state.
+
+Validation: production build and 4,108 tests passed, including 108 fixed seeds × 3 difficulties × ground / air / unequipped air completion, arrival weather, cancellation, retargeting, single-use costs, separate crew return and stored records. Browser automation timed out twice in this environment, so real browser play, animation quality, audio quality and the 8–12 minute human play target remain unverified. Earlier screenshots are not evidence for this phase.

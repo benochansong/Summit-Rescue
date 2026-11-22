@@ -3613,3 +3613,137 @@ html[data-motion="off"] .disaster-app *,
     transition: none !important;
   }
 }
+/* Phase 6-C: rotor, approach, hover, lift and departure have separate layers. */
+.helicopter-cinematic {
+  max-width: 880px;
+  background: #152d35;
+}
+.air-canvas {
+  width: 100%;
+  max-height: 48vh;
+  display: block;
+  border-radius: 12px;
+}
+.air-camera {
+  transform-origin: 440px 260px;
+  transition: transform 2s ease;
+}
+.air-hoist .air-camera {
+  transform: scale(1.1);
+}
+.air-main-rotor {
+  transform-origin: 0 -62px;
+  animation: air-rotor 0.14s linear infinite;
+}
+.air-tail-rotor {
+  animation: air-tail 0.22s linear infinite;
+}
+.rescue-aircraft {
+  animation: air-hover 3s ease-in-out infinite;
+}
+.air-approach .rescue-aircraft {
+  animation: air-arrive 5s ease-out both;
+}
+.air-depart .rescue-aircraft,
+.air-return .rescue-aircraft {
+  animation: air-leave 6s ease-in both;
+}
+.air-dust {
+  transform-origin: 440px 362px;
+  animation: air-dust 1.8s ease-out infinite;
+}
+.air-cloud {
+  animation: cliff-cloud 9s ease-in-out infinite alternate;
+}
+.air-hoist .air-stretcher {
+  animation: air-lift 5s ease-in-out both;
+}
+.air-hoist .air-lift > path {
+  stroke-dasharray: 140;
+  animation: air-rope 5s ease-in-out both;
+}
+.air-depart .air-lift {
+  display: none;
+}
+.air-request .air-dust,
+.air-request .air-searchlight,
+.air-complete .air-dust {
+  display: none;
+}
+.sky-panel p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.sky-panel button {
+  margin-top: 8px;
+}
+@keyframes air-rotor {
+  50% {
+    transform: scaleX(0.12);
+  }
+}
+@keyframes air-tail {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes air-hover {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes air-arrive {
+  from {
+    transform: translate(-320px, -80px) scale(0.45);
+    opacity: 0.2;
+  }
+  to {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes air-leave {
+  30% {
+    transform: translateY(-18px);
+  }
+  to {
+    transform: translate(390px, -120px) scale(0.45);
+    opacity: 0;
+  }
+}
+@keyframes air-dust {
+  from {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes air-lift {
+  to {
+    transform: translateY(-135px);
+  }
+}
+@keyframes air-rope {
+  to {
+    stroke-dashoffset: 135;
+  }
+}
+.motion-off .helicopter-cinematic * {
+  animation: none !important;
+  transition: none !important;
+}
+.motion-off .air-hoist .air-stretcher {
+  transform: translateY(-135px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .helicopter-cinematic * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .air-hoist .air-stretcher {
+    transform: translateY(-135px);
+  }
+}
