@@ -55,7 +55,7 @@ export function MissionSelect({
           <h2>구조대 훈련</h2>
           <strong className="orange">보유 경험치 {career.xp}</strong>
           <p>
-            임무 1~5·7~8 성공 시 100 + 별당 25 경험치. 임무 6은 S/A/B등급에
+            임무 1~5·7~9 성공 시 100 + 별당 25 경험치. 임무 6은 S/A/B등급에
             200/150/75. 각 능력은 최대 3단계입니다.
           </p>
         </div>
@@ -276,7 +276,11 @@ export function Loadout({
       </label>
       <div className="forecast-timeline">
         {(mission >= 7
-          ? disasterSchedule(disasterDifficulty ?? "normal", Number(seed) >>> 0)
+          ? disasterSchedule(
+              disasterDifficulty ?? "normal",
+              Number(seed) >>> 0,
+              mission,
+            )
           : experience
             ? gameSchedule({
                 mission,

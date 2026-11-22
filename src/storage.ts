@@ -31,6 +31,12 @@ export type RecordEntry = {
   rescued?: number;
   droneUses?: number;
   heliUses?: number;
+  air?: {
+    used: number;
+    status: string;
+    crewSafe: boolean;
+    method: "air" | "ground";
+  };
 };
 export type MissionStats = {
   completed: boolean;
@@ -93,6 +99,7 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
     "6": emptyStats(),
     "7": emptyStats(),
     "8": emptyStats(),
+    "9": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -160,7 +167,12 @@ export function readRecords(): RecordEntry[] {
 export function saveRecord(
   game: Game,
   mission = game.mission,
-  details: { difficulty?: Difficulty; rating?: number; bonus?: number } = {},
+  details: {
+    difficulty?: Difficulty;
+    rating?: number;
+    bonus?: number;
+    air?: RecordEntry["air"];
+  } = {},
 ): boolean {
   if (game.status === "active") return false;
   if (game.practice) return true;
@@ -185,6 +197,7 @@ export function saveRecord(
             ? 100 + details.rating * 25 + (details.bonus ?? 0)
             : 0,
       routes: game.routeReport,
+      air: details.air,
       difficulty: details.difficulty ?? game.experience?.difficulty,
       story: game.experience?.story,
     };

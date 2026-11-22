@@ -1,3 +1,6 @@
+import HelicopterPanel from "./HelicopterPanel";
+import HelicopterScene from "./HelicopterScene";
+import { airActive, airEta, skyLanding, airNames } from "./helicopter";
 import CliffRescue from "./CliffRescue";
 import { useEffect, useRef, useState } from "react";
 import MountainMap from "./Map";
@@ -35,7 +38,9 @@ import type { Difficulty } from "./experience";
 export function DisasterSetup({
   value,
   onChange,
+  mission = 7,
 }: {
+  mission?: 7 | 8 | 9;
   value: Difficulty;
   onChange: (d: Difficulty) => void;
 }) {
@@ -44,7 +49,7 @@ export function DisasterSetup({
       <span className="eyebrow orange">
         신규 독립 작전 · 기존 임무를 완료하지 않아도 출동 가능
       </span>
-      <h2>산이 변하면, 구조 작전도 변해야 한다</h2>
+      <h2>{missions[mission].subtitle}</h2>
       <div className="difficulty-choices">
         {(Object.keys(disasterProfiles) as Difficulty[]).map((id) => (
           <label key={id} className={value === id ? "chosen" : ""}>
@@ -56,8 +61,10 @@ export function DisasterSetup({
             />
             <strong>{disasterProfiles[id].name}</strong>
             <small>
-              {disasterProfiles[id].limit}분 · 로프 안전 폭{" "}
-              {disasterProfiles[id].window}%
+              {disasterProfiles[id].limit}분 ·{" "}
+              {mission === 9
+                ? "항공 지원 1회 · 지상 귀환 필수"
+                : `로프 안전 폭 ${disasterProfiles[id].window}%`}
             </small>
             <p>
               {id === "easy"
@@ -70,9 +77,10 @@ export function DisasterSetup({
         ))}
       </div>
       <p>
-        로프·신호·이송은 마우스 또는 키보드로 조작합니다. 자동 구조도 정상
-        완료할 수 있고, 지원 장비가 필요한 만큼 시간이 더 듭니다. 연출과 액션
-        조작 중에는 게임 시계가 멈춥니다.
+        {mission === 9
+          ? "기상·위치·처치 상태를 확인해 항공 지원 또는 지상 귀환을 선택합니다. 조난자 항공 이송 후에도 구조팀은 본부로 돌아와야 합니다."
+          : "현장 액션은 마우스·키보드·정밀 조작·자동 지원으로 진행합니다. 최종 구조를 확정할 때 비용이 적용됩니다."}{" "}
+        연출과 판단 중에는 게임 시계가 멈춥니다.
       </p>
     </section>
   );
@@ -102,7 +110,7 @@ export default function DisasterScreen({
     dialogRef = useRef<HTMLDivElement>(null);
   const weather = disasterWeather(game),
     profile = disasterProfiles[game.difficulty],
-    forecast = disasterSchedule(game.difficulty, game.seed).find(
+    forecast = disasterSchedule(game.difficulty, game.seed, game.mission).find(
       (p) => p.at > game.elapsed,
     ),
     times = disasterTimes(game.difficulty, game.seed);
@@ -116,13 +124,32 @@ export default function DisasterScreen({
   useEffect(() => {
     sound.current ??= new RescueAudio();
     sound.current.configure(settings);
+    sound.current.rotor(
+      game.air && airActive(game.air) && game.status === "active"
+        ? ["approach", "hoisting"].includes(game.air.status)
+          ? 1
+          : game.air.status === "enroute"
+            ? 0.3
+            : game.air.status === "transporting"
+              ? 0.15
+              : 0
+        : 0,
+    );
     sound.current.scene(
       weather,
       game.found ? 4 : game.events.includes("rock") ? 3 : 1,
       game.status === "active",
       !!scene,
     );
-  }, [settings, weather, scene, game.status, game.found, game.events]);
+  }, [
+    settings,
+    weather,
+    scene,
+    game.status,
+    game.found,
+    game.events,
+    game.air,
+  ]);
   useEffect(() => {
     const hide = () => {
       if (document.hidden) sound.current?.suspend();
@@ -222,6 +249,14 @@ export default function DisasterScreen({
       if (
         !saveRecord(next, next.mission, {
           bonus: next.cliffResult?.bonus ?? 0,
+          air: next.air
+            ? {
+                used: next.air.used,
+                status: next.air.status,
+                crewSafe: next.position === "base",
+                method: next.air.onboard ? "air" : "ground",
+              }
+            : undefined,
           difficulty: next.difficulty,
           rating: disasterRating(next),
         })
@@ -252,7 +287,7 @@ export default function DisasterScreen({
       initial.equipment,
       initial.skills,
       initial.practice,
-      initial.mission as 7 | 8,
+      initial.mission as 7 | 8 | 9,
     );
     setGame(settings.skipDialogue ? { ...next, scenes: [] } : next);
     setSelected("gate");
@@ -400,15 +435,25 @@ export default function DisasterScreen({
                 ),
                 route: route ?? [],
                 cost: (to) => disasterCost(game, { type: "move", to }),
-                helicopter: game.helicopter
-                  ? {
-                      target: game.helicopter.origin,
-                      progress: Math.max(
-                        0,
-                        1 - (game.helicopter.at - game.elapsed) / 25,
-                      ),
-                    }
-                  : undefined,
+                landingPoints: game.mission === 9 ? skyLanding : undefined,
+                helicopter:
+                  game.air && airActive(game.air)
+                    ? {
+                        target: game.air.target,
+                        progress: Math.max(
+                          0.05,
+                          Math.min(1, 1 - airEta(game.air) / 45),
+                        ),
+                      }
+                    : game.helicopter
+                      ? {
+                          target: game.helicopter.origin,
+                          progress: Math.max(
+                            0,
+                            1 - (game.helicopter.at - game.elapsed) / 25,
+                          ),
+                        }
+                      : undefined,
               }}
             />
             <div className="disaster-movement panel">
@@ -503,7 +548,13 @@ export default function DisasterScreen({
             </section>
             <section className="panel field-actions">
               <span className="eyebrow orange">
-                구조 1팀 · {game.mission === 8 ? "한서윤" : "이재하"} 씨 수색
+                구조 1팀 ·{" "}
+                {game.mission === 9
+                  ? "박도현"
+                  : game.mission === 8
+                    ? "한서윤"
+                    : "이재하"}{" "}
+                씨 수색
               </span>
               <h2>
                 {game.found
@@ -512,20 +563,24 @@ export default function DisasterScreen({
               </h2>
               <p>
                 {game.found
-                  ? `로프 접근 ${game.secured ? "완료" : "대기"} → 처치 ${game.treated ? "완료" : "대기"} → 이송 ${game.carried ? "완료" : "대기"}`
+                  ? game.mission === 9
+                    ? `현장 접근 완료 → 처치 ${game.treated ? "완료" : "대기"} → ${game.air?.onboard ? "항공 탑승 · 구조팀 귀환 필요" : "지상 동행 또는 항공 지원"}`
+                    : `로프 접근 ${game.secured ? "완료" : "대기"} → 처치 ${game.treated ? "완료" : "대기"} → 이송 ${game.carried ? "완료" : "대기"}`
                   : `남은 후보: ${game.possible.map((id) => point(id, 7).name).join(" · ")}`}
               </p>
               <div className="field-buttons">
                 {control({ type: "start", kind: "signal" }, "신호 탐지")}
-                {game.mission === 8
-                  ? game.cliff &&
-                    control(
-                      { type: "cliff", command: { type: "resume" } },
-                      "절벽 구조 계속",
-                    )
-                  : control({ type: "start", kind: "rope" }, "로프 구조")}
+                {game.mission === 9
+                  ? null
+                  : game.mission === 8
+                    ? game.cliff &&
+                      control(
+                        { type: "cliff", command: { type: "resume" } },
+                        "절벽 구조 계속",
+                      )
+                    : control({ type: "start", kind: "rope" }, "로프 구조")}
                 {control({ type: "aid" }, "응급처치")}
-                {game.mission !== 8 &&
+                {game.mission === 7 &&
                   control({ type: "start", kind: "carry" }, "부상자 이송")}
                 {game.equipment.includes("kit") &&
                   control({ type: "kit" }, `응급키트 ${2 - game.kitUses}회`)}
@@ -534,28 +589,32 @@ export default function DisasterScreen({
               </div>
               <small>현장 액션은 조작 완료 시 비용 반영. 자동 지원 가능.</small>
             </section>
-            <section className="panel air-panel">
-              <span className="eyebrow orange">
-                항공 지원 {game.heliUses} / 2
-              </span>
-              <h2>하늘이 열리는 시간</h2>
-              <p>
-                {helicopterReason(game) ||
-                  "출동 가능 · 요청 5분 + 접근 25분 · 도착 시 기상 재확인"}
-              </p>
-              {game.helicopter && (
-                <progress
-                  aria-label="헬기 접근"
-                  max="25"
-                  value={25 - (game.helicopter.at - game.elapsed)}
-                />
-              )}
-              <small>
-                H: {landingSites.map((id) => point(id, 7).name).join(" · ")}
-              </small>
-              {control({ type: "helicopter" }, "헬기 구조 요청")}
-              {control({ type: "wait" }, "현장 대기")}
-            </section>
+            {game.air ? (
+              <HelicopterPanel game={game} act={act} busy={busy || modal} />
+            ) : (
+              <section className="panel air-panel">
+                <span className="eyebrow orange">
+                  항공 지원 {game.heliUses} / 2
+                </span>
+                <h2>하늘이 열리는 시간</h2>
+                <p>
+                  {helicopterReason(game) ||
+                    "출동 가능 · 요청 5분 + 접근 25분 · 도착 시 기상 재확인"}
+                </p>
+                {game.helicopter && (
+                  <progress
+                    aria-label="헬기 접근"
+                    max="25"
+                    value={25 - (game.helicopter.at - game.elapsed)}
+                  />
+                )}
+                <small>
+                  H: {landingSites.map((id) => point(id, 7).name).join(" · ")}
+                </small>
+                {control({ type: "helicopter" }, "헬기 구조 요청")}
+                {control({ type: "wait" }, "현장 대기")}
+              </section>
+            )}
             <section className="panel disaster-radio">
               <span className="eyebrow orange">구조본부 무전</span>
               <div role="status">{notice || game.log[0]}</div>
@@ -596,15 +655,23 @@ export default function DisasterScreen({
               </h2>
               {game.status === "success" && (
                 <RescueIllustration
-                  scene={game.evacuated ? "helicopter" : "success"}
+                  scene={
+                    game.evacuated || game.air?.status === "complete"
+                      ? "helicopter"
+                      : "success"
+                  }
                 />
               )}
               <p>{game.reason}</p>
               {game.status === "success" ? (
                 <blockquote>
                   “그 목소리를 듣고 버틸 수 있었어요.”{" "}
-                  {game.mission === 8 ? "서윤" : "재하"} 씨가 구조대에 고개를
-                  숙입니다.
+                  {game.mission === 9
+                    ? "도현"
+                    : game.mission === 8
+                      ? "서윤"
+                      : "재하"}{" "}
+                  씨가 구조대에 고개를 숙입니다.
                 </blockquote>
               ) : (
                 <p className="retry-tip">
@@ -639,6 +706,24 @@ export default function DisasterScreen({
                   <strong>+{disasterXp(game)}</strong>
                 </div>
               </div>
+              {game.air && (
+                <p>
+                  구조 방식:{" "}
+                  {game.air.onboard
+                    ? "항공 이송 + 구조팀 지상 귀환"
+                    : "지상 동행"}{" "}
+                  · 출동 {game.air.used}/1회 · 헬기 {airNames[game.air.status]}{" "}
+                  · 조난자{" "}
+                  {game.air.status === "complete"
+                    ? "안전 인계"
+                    : game.air.onboard
+                      ? "항공 이송 중"
+                      : game.status === "success"
+                        ? "지상 안전 귀환"
+                        : "현장 대기"}{" "}
+                  · 구조팀 {game.position === "base" ? "본부 복귀" : "미복귀"}
+                </p>
+              )}
               {game.cliffResult && (
                 <p>
                   절벽 액션: {game.cliffResult.grade} · 실수{" "}
@@ -719,6 +804,12 @@ export default function DisasterScreen({
                 </button>
               </div>
             </section>
+          ) : scene?.startsWith("air-") ? (
+            <HelicopterScene
+              scene={scene}
+              busy={busy}
+              onContinue={() => act({ type: "ack" })}
+            />
           ) : scene ? (
             <section
               className={`modal cinematic cinematic-${scene}`}
@@ -727,20 +818,26 @@ export default function DisasterScreen({
               aria-labelledby="scene-title"
             >
               <span className="eyebrow orange">
-                {game.mission === 8 && scene === "dispatch"
-                  ? "15:30 · 백운산 동쪽 암릉"
-                  : scenes[scene].eyebrow}
+                {game.mission === 9 && scene === "dispatch"
+                  ? "16:20 · 고산 능선 구조 신고"
+                  : game.mission === 8 && scene === "dispatch"
+                    ? "15:30 · 백운산 동쪽 암릉"
+                    : scenes[scene].eyebrow}
               </span>
               <h2 id="scene-title">{scenes[scene].title}</h2>
               <RescueIllustration scene={scene} />
               <p>
-                {game.mission === 8 && scene === "dispatch"
-                  ? missions[8].description
-                  : game.mission === 8 && scene === "found"
-                    ? "절벽 아래 서윤 씨를 발견했습니다. 장비를 확인하고 로프를 안정시킨 뒤 하강하세요. 안전 인양 전까지 이동할 수 없습니다."
-                    : game.mission === 8 && scene === "secured"
-                      ? "서윤 씨를 안전 지형으로 인양했습니다. 기본 처치 후 본부로 함께 귀환하세요."
-                      : scenes[scene].text}
+                {game.mission === 9 && scene === "dispatch"
+                  ? missions[9].description
+                  : game.mission === 9 && scene === "found"
+                    ? "도현 씨를 발견했습니다. 기본 응급처치 후 지상 동행 또는 H 지점 항공 지원을 선택하세요. 항공 이송 후에도 구조팀 귀환이 필요합니다."
+                    : game.mission === 8 && scene === "dispatch"
+                      ? missions[8].description
+                      : game.mission === 8 && scene === "found"
+                        ? "절벽 아래 서윤 씨를 발견했습니다. 장비를 확인하고 로프를 안정시킨 뒤 하강하세요. 안전 인양 전까지 이동할 수 없습니다."
+                        : game.mission === 8 && scene === "secured"
+                          ? "서윤 씨를 안전 지형으로 인양했습니다. 기본 처치 후 본부로 함께 귀환하세요."
+                          : scenes[scene].text}
               </p>
               <small>
                 현지 시각은 멈춰 있습니다. 지도를 확인한 뒤 결정하세요.

@@ -1,4 +1,15 @@
 import {
+  newAir,
+  airMinute,
+  requestAir,
+  cancelAir,
+  retargetAir,
+  airRequestReason,
+  airActive,
+  type AirState,
+  type AirContext,
+} from "./helicopter";
+import {
   beginCliff,
   cliffStep,
   cliffResult,
@@ -43,11 +54,13 @@ export type DisasterGame = Game & {
   evacuated: boolean;
   detours: number;
   crossings: number;
+  air?: AirState;
   cliff?: CliffSession;
   cliffResult?: CliffResult;
 };
 export type DisasterAction =
   | { type: "cliff"; command: CliffCommand }
+  | { type: "air-request" | "air-cancel" | "air-retarget" }
   | { type: "move"; to: string }
   | {
       type:
@@ -74,11 +87,12 @@ export function createDisaster(
   items: Equipment[] = ["rope", "kit", "blanket"],
   skills?: SkillLevels,
   practice = false,
-  mission: 7 | 8 = 7,
+  mission: 7 | 8 | 9 = 7,
 ): DisasterGame {
   const g = createGame(seed, mission, items, skills, practice);
   return {
     ...g,
+    air: mission === 9 ? newAir() : undefined,
     target: disasterCandidates[g.seed % 3],
     possible: [...disasterCandidates],
     health: 100,
@@ -99,14 +113,16 @@ export function createDisaster(
     detours: 0,
     crossings: 0,
     log: [
-      mission === 8
-        ? "한서윤 · 29세 · 동쪽 암릉 절벽 아래 고립. 제2전망대에서 무전 신호를 포착하십시오."
-        : "이재하 · 34세 · 북쪽 암릉에서 다리 부상. 제2전망대에서 신호 방향을 분석하십시오.",
+      mission === 9
+        ? "박도현 · 고산 능선 부상 신고. 기상 예보는 +60분부터 강풍입니다. 항공 지원 여부와 지상 귀환을 비교하십시오."
+        : mission === 8
+          ? "한서윤 · 29세 · 동쪽 암릉 절벽 아래 고립. 제2전망대에서 무전 신호를 포착하십시오."
+          : "이재하 · 34세 · 북쪽 암릉에서 다리 부상. 제2전망대에서 신호 방향을 분석하십시오.",
     ],
   };
 }
 export const disasterWeather = (g: DisasterGame, at = g.elapsed) =>
-  disasterSchedule(g.difficulty, g.seed)
+  disasterSchedule(g.difficulty, g.seed, g.mission)
     .filter((p) => p.at <= at)
     .at(-1)!.weather;
 export function edgeState(
@@ -178,7 +194,7 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
     return {
       time: Math.ceil(
         (e?.time ?? (steep ? 20 : 10)) *
-          (g.found ? 1.5 : 1) *
+          (g.found && !g.air?.onboard ? 1.5 : 1) *
           (w === "snow" ? 1.3 : 1) +
           (river && w === "rain" ? 8 : 0) +
           (e?.risk === "ridge" && w === "wind" ? 5 : 0),
@@ -190,7 +206,7 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
             (steep && g.equipment.includes("rope") ? 4 : 0) -
             (steep ? g.skills.mountain : 0),
         ) *
-          (g.found ? 1.6 : 1) *
+          (g.found && !g.air?.onboard ? 1.6 : 1) *
           p.energy *
           (w === "rain"
             ? 1.3
@@ -215,6 +231,9 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
       energy: 6,
     };
   if (a.type === "rest") return { time: 15, energy: -25 };
+  if (a.type === "air-request" || a.type === "air-retarget")
+    return { time: 2, energy: 1 };
+  if (a.type === "air-cancel") return { time: 2, energy: 0 };
   if (a.type === "wait") return { time: 10, energy: 0 };
   if (a.type === "aid" || a.type === "kit") return { time: 10, energy: 3 };
   if (a.type === "blanket") return { time: 5, energy: 1 };
@@ -243,6 +262,7 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
   return { time: 0, energy: 0 };
 }
 export function helicopterReason(g: DisasterGame) {
+  if (g.mission === 9) return "새 항공 지원 패널에서 요청하세요.";
   if (g.mission === 8) return "이 작전은 절벽 인양 후 지상 귀환을 진행합니다.";
   if (g.helicopter)
     return "헬기가 접근 중입니다. 현장에서 대기하거나 취소 없이 지상 귀환할 수 있습니다.";
@@ -255,6 +275,13 @@ export function helicopterReason(g: DisasterGame) {
     return "현재 기상으로 출동 불가. 맑음·흐림에서만 지원합니다.";
   return "";
 }
+export const airContext = (g: DisasterGame): AirContext => ({
+  at: g.elapsed,
+  weather: disasterWeather(g),
+  position: g.position,
+  health: g.health,
+  ready: g.found && g.secured && g.treated && g.carried,
+});
 export function disasterDisabled(g: DisasterGame, a: DisasterAction): string {
   if (g.status !== "active") return "종료된 임무입니다.";
   if (a.type === "ack") return g.scenes.length ? "" : "확인할 상황이 없습니다.";
@@ -362,6 +389,26 @@ export function disasterDisabled(g: DisasterGame, a: DisasterAction): string {
       !["careful", "steady"].includes(a.speed))
   )
     return "이송 경로와 속도를 선택하세요.";
+  if (
+    a.type === "air-request" ||
+    a.type === "air-cancel" ||
+    a.type === "air-retarget"
+  ) {
+    if (!g.air) return "이 작전은 전용 항공 지원을 사용하지 않습니다.";
+    if (a.type === "air-request") {
+      const reason = airRequestReason(g.air, airContext(g));
+      if (reason) return reason;
+    }
+    if (a.type === "air-cancel" && cancelAir(g.air, g.elapsed) === g.air)
+      return "취소 가능한 항공 요청이 없습니다.";
+    if (
+      a.type === "air-retarget" &&
+      retargetAir(g.air, airContext(g)) === g.air
+    )
+      return "새로운 H 지점에서 탑승 전에 변경하세요.";
+  }
+  if (g.air?.onboard && ["aid", "kit", "blanket"].includes(a.type))
+    return "조난자는 이미 헬기에 탑승했습니다.";
   if (a.type === "helicopter") {
     const reason = helicopterReason(g);
     if (reason) return reason;
@@ -383,20 +430,36 @@ export function carryTerrain(g: DisasterGame) {
   const round = g.action?.round ?? 0;
   return { blocked: (g.seed + round) % 3, narrow: (g.seed + round + 1) % 3 };
 }
-function spend(g: DisasterGame, c: Cost): DisasterGame {
-  let health = g.health;
-  for (let i = 0; i < c.time; i++)
-    health = decayHealth(
-      health,
-      0.13 + g.injury,
-      disasterWeather(g, g.elapsed + i),
-      g.elapsed + i >= missions[g.mission].sunset,
-      g.insulated,
-      false,
-      1 - disasterProfiles[g.difficulty].decay,
-    );
+function spend(g: DisasterGame, c: Cost, movingTo?: string): DisasterGame {
+  let health = g.health,
+    air = g.air;
+  for (let i = 0; i < c.time; i++) {
+    if (!air?.onboard)
+      health = decayHealth(
+        health,
+        0.13 + g.injury,
+        disasterWeather(g, g.elapsed + i),
+        g.elapsed + i >= missions[g.mission].sunset,
+        g.insulated,
+        false,
+        1 - disasterProfiles[g.difficulty].decay,
+      );
+    if (air)
+      air = airMinute(air, {
+        at: g.elapsed + i + 1,
+        weather: disasterWeather(g, g.elapsed + i + 1),
+        position: movingTo
+          ? i + 1 === c.time
+            ? movingTo
+            : "transit"
+          : g.position,
+        ready: g.found && g.secured && g.treated && g.carried,
+        health,
+      });
+  }
   return {
     ...g,
+    air,
     elapsed: g.elapsed + c.time,
     stamina: Math.max(0, Math.min(100, g.stamina - c.energy)),
     health,
@@ -445,7 +508,8 @@ function updateWorld(g: DisasterGame): DisasterGame {
   const t = disasterTimes(g.difficulty, g.seed),
     events = [...g.events],
     scenes = [...g.scenes],
-    log = [...g.log];
+    log = [...g.log],
+    reports = [...g.routeReport];
   const thresholds: [string, number, string, Scene?][] = [
     [
       "rock-warning",
@@ -471,13 +535,16 @@ function updateWorld(g: DisasterGame): DisasterGame {
     ],
     [
       "storm",
-      disasterSchedule(g.difficulty, g.seed).find((s) => s.weather === "rain")!
-        .at,
+      disasterSchedule(g.difficulty, g.seed, g.mission).find(
+        (s) => s.weather === "rain",
+      )!.at,
       "폭우 시작. 이동 부담 증가, 항공 지원 제한.",
       "storm",
     ],
   ];
-  for (const step of disasterSchedule(g.difficulty, g.seed).slice(1)) {
+  for (const step of disasterSchedule(g.difficulty, g.seed, g.mission).slice(
+    1,
+  )) {
     thresholds.push([
       `forecast-${step.at}`,
       Math.max(0, step.at - 20),
@@ -500,7 +567,25 @@ function updateWorld(g: DisasterGame): DisasterGame {
       log.unshift(message);
       if (scene) scenes.push(scene);
     }
-  let n = { ...g, events, scenes, log: log.slice(0, 30) };
+  if (g.air)
+    for (const e of g.air.history) {
+      const id = "air-" + e.status + "-" + e.at;
+      if (events.includes(id)) continue;
+      events.push(id);
+      log.unshift(e.message);
+      reports.push("+" + e.at + "분 항공: " + e.message);
+      const scene: Partial<Record<string, Scene>> = {
+        requested: "air-request",
+        approach: "air-approach",
+        hoisting: "air-hoist",
+        transporting: "air-depart",
+        complete: "air-complete",
+        delayed: "air-delay",
+        returning: "air-return",
+      };
+      if (scene[e.status]) scenes.push(scene[e.status]!);
+    }
+  let n = { ...g, events, scenes, routeReport: reports, log: log.slice(0, 30) };
   if (n.helicopter && n.elapsed >= n.helicopter.at) {
     const h = n.helicopter;
     n = { ...n, helicopter: null };
@@ -525,7 +610,12 @@ function updateWorld(g: DisasterGame): DisasterGame {
       ];
   }
   const ready =
-    n.found && n.secured && n.treated && n.carried && n.position === "base";
+    n.found &&
+    n.secured &&
+    n.treated &&
+    n.carried &&
+    n.position === "base" &&
+    (!n.air?.onboard || n.air.status === "complete");
   if (
     n.health <= 0 ||
     n.elapsed > disasterProfiles[n.difficulty].limit ||
@@ -541,9 +631,25 @@ function updateWorld(g: DisasterGame): DisasterGame {
     n.helicopter = null;
   } else if (ready) {
     n.status = "success";
-    n.reason = n.evacuated
-      ? "항공 인계 완료. 조난자와 구조대 전원 안전."
-      : "지상 귀환 완료. 조난자와 구조대 전원 안전.";
+    if (n.air && airActive(n.air) && !n.air.onboard)
+      n.air = {
+        ...n.air,
+        status: "cancelled",
+        history: [
+          ...n.air.history,
+          {
+            at: n.elapsed,
+            status: "cancelled",
+            message: "지상 귀환 완료 · 항공 요청 종료",
+          },
+        ],
+      };
+    n.reason =
+      n.air?.status === "complete"
+        ? "조난자 항공 인계 및 지상 구조팀 본부 복귀 완료."
+        : n.evacuated
+          ? "항공 인계 완료. 조난자와 구조대 전원 안전."
+          : "지상 귀환 완료. 조난자와 구조대 전원 안전.";
     n.scenes = [];
   }
   return n;
@@ -646,7 +752,11 @@ export function disasterTransition(
     if (n.action!.round === 3) n = finishAction(n, false);
   } else {
     const c = disasterCost(g, a);
-    n = spend(n, c);
+    if (a.type === "air-cancel") n.air = cancelAir(g.air!, g.elapsed);
+    if (a.type === "air-retarget") n.air = retargetAir(g.air!, airContext(g));
+    n = spend(n, c, a.type === "move" ? a.to : undefined);
+    if (a.type === "air-request")
+      n.air = requestAir(g.air!, { ...airContext(g), at: n.elapsed });
     if (a.type === "move") {
       const goal = g.found
         ? "base"
@@ -700,6 +810,7 @@ export function disasterTransition(
       n.searched = [...g.searched, g.position];
       if (g.position === g.target) {
         n.found = true;
+        if (g.mission === 9) n.secured = true;
         if (g.mission === 8) n.cliff = beginCliff();
         n.scenes.push("found");
       } else if (["gate", "lookout"].includes(g.position))
@@ -714,6 +825,7 @@ export function disasterTransition(
     }
     if (a.type === "aid" && n.health > 0) {
       n.treated = true;
+      if (g.mission === 9) n.carried = true;
       n.injury = 0;
       n.health = Math.min(100, n.health + 22 + g.skills.response * 3);
     }
@@ -770,6 +882,10 @@ export const disasterXp = (g: DisasterGame) =>
     ? 100 + disasterRating(g) * 25 + (g.cliffResult?.bonus ?? 0)
     : 0;
 export function disasterGoal(g: DisasterGame) {
+  if (g.air?.onboard)
+    return g.air.status === "complete"
+      ? "조난자 안전 인계 완료 · 구조팀 본부 귀환"
+      : "조난자 항공 이송 중 · 구조팀 본부 귀환";
   if (!g.found)
     return g.possible.length === 1
       ? `${point(g.possible[0], 7).name}에서 현장 수색`

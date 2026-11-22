@@ -57,6 +57,7 @@ export default function MountainMap({
     route: string[];
     cost: (to: string) => { time: number; energy: number };
     helicopter?: { target: string; progress: number };
+    landingPoints?: string[];
   };
 }) {
   const region = regionFor(game.mission),
@@ -605,7 +606,7 @@ export default function MountainMap({
             );
           })()}
         {game.mission >= 7 &&
-          ["lookout", "hut", "pine"].map((id) => {
+          (tactical?.landingPoints ?? ["lookout", "hut", "pine"]).map((id) => {
             const p = mapPoint(id);
             return (
               <text

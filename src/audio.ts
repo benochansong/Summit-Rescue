@@ -16,6 +16,8 @@ export class RescueAudio {
   private master: GainNode | null = null;
   private ambient: GainNode | null = null;
   private filter: BiquadFilterNode | null = null;
+  private rotorGain: GainNode | null = null;
+  private rotorMod: GainNode | null = null;
   configure(settings: SoundSettings) {
     this.settings = settings;
     try {
@@ -142,6 +144,44 @@ export class RescueAudio {
       /* Audio failure never changes game state. */
     }
   }
+  rotor(proximity: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    try {
+      if (!this.rotorGain && proximity > 0) {
+        const blade = ctx.createOscillator(),
+          pulse = ctx.createOscillator(),
+          mod = ctx.createGain(),
+          gain = ctx.createGain();
+        blade.type = "triangle";
+        blade.frequency.value = 73;
+        pulse.type = "sine";
+        pulse.frequency.value = 17;
+        mod.gain.value = 0.02;
+        gain.gain.value = 0;
+        pulse.connect(mod);
+        mod.connect(gain.gain);
+        blade.connect(gain);
+        gain.connect(this.master);
+        blade.start();
+        pulse.start();
+        this.rotorGain = gain;
+        this.rotorMod = mod;
+      }
+      this.rotorMod?.gain.setTargetAtTime(
+        this.settings.sound ? Math.max(0, Math.min(1, proximity)) * 0.02 : 0,
+        ctx.currentTime,
+        0.7,
+      );
+      this.rotorGain?.gain.setTargetAtTime(
+        this.settings.sound ? Math.max(0, Math.min(1, proximity)) * 0.08 : 0,
+        ctx.currentTime,
+        0.7,
+      );
+    } catch {
+      /* Optional rotor sound never affects simulation. */
+    }
+  }
   suspend() {
     try {
       void this.ctx?.suspend().catch(() => {});
@@ -156,5 +196,7 @@ export class RescueAudio {
       /* Cleanup must not throw. */
     }
     this.ctx = null;
+    this.rotorGain = null;
+    this.rotorMod = null;
   }
 }
