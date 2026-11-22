@@ -162,14 +162,20 @@ export default function RescueActionPanel({
   const session = game.action!,
     [angle, setAngle] = useState(0),
     [gauge, setGauge] = useState(0),
-    [precision, setPrecision] = useState(
-      () =>
-        !motion ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    [manualPrecision, setPrecision] = useState(false),
+    [reducedMotion, setReducedMotion] = useState(
+      () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     ),
     [speed, setSpeed] = useState<"careful" | "steady">("careful");
   const started = useRef(0),
     value = useRef(0);
+  const precision = !motion || reducedMotion || manualPrecision;
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   useEffect(() => {
     if (session.kind !== "rope" || precision) return;
     let frame = 0;
@@ -240,7 +246,7 @@ export default function RescueActionPanel({
               type="checkbox"
               checked={precision}
               onChange={(e) => setPrecision(e.target.checked)}
-              disabled={!motion}
+              disabled={!motion || reducedMotion}
             />{" "}
             정밀 조작 · 움직임 없이 슬라이더로 장력 조절
           </label>

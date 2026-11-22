@@ -104,9 +104,21 @@ export function disasterSchedule(
   return [
     { at: 0, weather: "clear" },
     { at: 30, weather: "cloudy" },
+    { at: 45, weather: "fog" },
+    { at: p.rain + offset - 25, weather: "drizzle" },
     { at: p.rain + offset, weather: "rain" },
     { at: p.wind + offset, weather: "wind" },
     { at: p.clear + offset, weather: "clear" },
     { at: p.snow + offset, weather: "snow" },
   ];
 }
+
+export const disasterVisibility: Record<Weather, string> = {
+  clear: "시야 양호",
+  cloudy: "시야 보통",
+  fog: "시야 매우 제한",
+  drizzle: "시야 감소",
+  rain: "시야 제한",
+  wind: "먼지로 시야 불안정",
+  snow: "눈으로 시야 제한",
+};

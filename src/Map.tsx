@@ -758,7 +758,7 @@ export default function MountainMap({
         )}
 
         <g transform={`scale(1 ${verticalScale})`}>
-          {weather === "rain" && (
+          {(weather === "rain" || weather === "drizzle") && (
             <rect
               className="rain-overlay"
               width="1000"

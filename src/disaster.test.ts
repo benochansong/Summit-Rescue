@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   allRoutesSafe,
   carryTerrain,
@@ -108,6 +116,28 @@ function go(g: DisasterGame, to: string) {
   return g;
 }
 type Strategy = "auto" | "no-equipment" | "mistakes";
+const balance: { difficulty: Difficulty; strategy: Strategy; time: number }[] =
+  [];
+afterAll(() => {
+  console.log(
+    "Disaster balance:",
+    JSON.stringify(
+      Object.keys(disasterProfiles).map((difficulty) => {
+        const times = balance
+          .filter((r) => r.difficulty === difficulty)
+          .map((r) => r.time);
+        return {
+          difficulty,
+          runs: times.length,
+          min: Math.min(...times),
+          max: Math.max(...times),
+          over210: times.filter((t) => t > 210).length,
+          over240: times.filter((t) => t > 240).length,
+        };
+      }),
+    ),
+  );
+});
 function rescue(seed: number, difficulty: Difficulty, strategy: Strategy) {
   let g = dismiss(
     createDisaster(
@@ -153,6 +183,7 @@ describe("재난 통합 작전: 108시드 × 3난이도 × 자동/장비없음/�
       for (let seed = 0; seed < 108; seed++)
         it(`${difficulty}/${strategy}/${seed}`, () => {
           const g = rescue(seed, difficulty, strategy);
+          balance.push({ difficulty, strategy, time: g.elapsed });
           expect(
             g.status,
             JSON.stringify({
@@ -381,7 +412,7 @@ describe("헬기 요청과 도착 재검사", () => {
     expect(g.position).toBe("base");
   });
   it("도착 시 악천후면 회항하고 지상 귀환 가능", () => {
-    let g = dismiss(act(ready(80), { type: "helicopter" }));
+    let g = dismiss(act(ready(25), { type: "helicopter" }));
     for (let i = 0; i < 2; i++)
       g = dismiss(act({ ...g, stamina: 70 }, { type: "rest" }));
     expect(g.helicopter).toBeNull();
@@ -442,5 +473,88 @@ describe("기존 저장과 재난 개인 기록", () => {
     const g = { ...rescue(2, "easy", "auto"), practice: true };
     saveRecord(g, 7, { difficulty: g.difficulty, rating: disasterRating(g) });
     expect(readRecords()).toEqual([]);
+  });
+});
+
+describe("Phase 6-A 기상과 대응 기록", () => {
+  it("7종 기상의 경계·예보·시드가 일치", () => {
+    for (const difficulty of Object.keys(disasterProfiles) as Difficulty[])
+      for (let seed = 0; seed < 9; seed++) {
+        const g = dismiss(createDisaster(seed, difficulty)),
+          steps = disasterSchedule(difficulty, seed);
+        expect(new Set(steps.map((s) => s.weather)).size).toBe(7);
+        for (let i = 1; i < steps.length; i++) {
+          expect(disasterWeather(g, steps[i].at - 1)).toBe(
+            steps[i - 1].weather,
+          );
+          expect(disasterWeather(g, steps[i].at)).toBe(steps[i].weather);
+          const n = act({ ...g, elapsed: steps[i].at - 10 }, { type: "wait" });
+          expect(n.events).toContain(`weather-${steps[i].at}`);
+          expect(n.events).toContain(`forecast-${steps[i].at}`);
+        }
+      }
+  });
+  it("비는 체력 증가, 안개는 수색 증가, 눈과 강풍은 이동 부담 증가", () => {
+    const g = { ...dismiss(createDisaster(0)), position: "cedar" };
+    const move = { type: "move", to: "ridge" } as const,
+      dry = disasterCost(g, move);
+    expect(disasterCost({ ...g, elapsed: 75 }, move).energy).toBeGreaterThan(
+      dry.energy,
+    );
+    expect(disasterCost({ ...g, elapsed: 45 }, { type: "search" }).time).toBe(
+      disasterCost(g, { type: "search" }).time + 5,
+    );
+    expect(disasterCost({ ...g, elapsed: 155 }, move).time).toBeGreaterThan(
+      dry.time,
+    );
+    const snow = disasterCost({ ...g, elapsed: 315 }, move);
+    expect(snow.time).toBeGreaterThan(dry.time);
+    expect(snow.energy).toBeGreaterThan(dry.energy);
+  });
+  it("실제로 통제 때문에 경로를 바꾼 이동만 우회 평가", () => {
+    const g = {
+      ...dismiss(createDisaster(0)),
+      position: "cave",
+      elapsed: 100,
+      found: true,
+      secured: true,
+      treated: true,
+      carried: true,
+    };
+    const n = act(g, { type: "move", to: "waterfall" });
+    expect(n.detours).toBe(1);
+    expect(n.routeReport.join()).toContain("통제 우회 선택");
+    expect(n.routeReport.join()).toContain("폭우 이동");
+    const early = act({ ...g, elapsed: 10 }, { type: "move", to: "waterfall" });
+    expect(early.detours).toBe(0);
+    const west = act(
+      { ...g, position: "west" },
+      { type: "move", to: "spring" },
+    );
+    expect(west.detours).toBe(0);
+  });
+  it("주의·일시 개방 통과도 실제 출발 경로 상태로 평가", () => {
+    const g = { ...dismiss(createDisaster(0)), position: "fork", elapsed: 30 };
+    expect(act(g, { type: "move", to: "cave" }).crossings).toBe(1);
+    expect(
+      act({ ...g, elapsed: 0 }, { type: "move", to: "cave" }).crossings,
+    ).toBe(0);
+  });
+  it("체력이 가득 차도 헬기 도착까지 현장 대기 가능", () => {
+    let g = {
+      ...dismiss(createDisaster(0)),
+      position: "lookout",
+      elapsed: 220,
+      found: true,
+      secured: true,
+      treated: true,
+      carried: true,
+    };
+    g = dismiss(act(g, { type: "helicopter" }));
+    g = dismiss(act(g, { type: "rest" }));
+    expect(g.stamina).toBe(100);
+    g = act(g, { type: "wait" });
+    expect(g.status).toBe("success");
+    expect(g.evacuated).toBe(true);
   });
 });

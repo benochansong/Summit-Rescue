@@ -1,4 +1,5 @@
-export type Weather = "clear" | "cloudy" | "fog" | "rain" | "wind" | "snow";
+export type Weather =
+  "clear" | "cloudy" | "fog" | "drizzle" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
 export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7];
@@ -64,6 +65,7 @@ export const weatherInfo: Record<
   clear: { name: "맑음", icon: "☀", detail: "14°C · 시야 양호" },
   cloudy: { name: "흐림", icon: "☁", detail: "10°C · 비구름 접근" },
   fog: { name: "안개", icon: "≋", detail: "8°C · 수색 +5분" },
+  drizzle: { name: "비", icon: "☂", detail: "7°C · 이동 체력 ×1.1" },
   rain: { name: "폭우", icon: "☂", detail: "5°C · 이동 체력 ×1.3" },
   wind: { name: "강풍", icon: "彡", detail: "2°C · 드론 비행 불가" },
   snow: { name: "폭설", icon: "❄", detail: "−4°C · 이동 시간 ×1.3" },

@@ -5,6 +5,7 @@ import {
   disasterProfiles,
   disasterSchedule,
   disasterTimes,
+  disasterVisibility,
   landingSites,
   scenes,
 } from "./disasterData";
@@ -344,7 +345,12 @@ export default function DisasterScreen({
           <strong>
             {weatherInfo[weather].icon} {weatherInfo[weather].name}
           </strong>
-          <span>{weatherInfo[weather].detail}</span>
+          <span>
+            {weatherInfo[weather].detail}
+            {!weatherInfo[weather].detail.includes(
+              disasterVisibility[weather],
+            ) && ` · ${disasterVisibility[weather]}`}
+          </span>
           <span>
             {forecast
               ? `${forecast.at - game.elapsed}분 후 ${weatherInfo[forecast.weather].name}`
@@ -525,6 +531,7 @@ export default function DisasterScreen({
                 H: {landingSites.map((id) => point(id, 7).name).join(" · ")}
               </small>
               {control({ type: "helicopter" }, "헬기 구조 요청")}
+              {control({ type: "wait" }, "현장 대기")}
             </section>
             <section className="panel disaster-radio">
               <span className="eyebrow orange">구조본부 무전</span>
@@ -614,7 +621,18 @@ export default function DisasterScreen({
                   .filter((x) => x === "rock" || x === "flood")
                   .map((x) => (x === "rock" ? "낙석" : "급류"))
                   .join(" · ") || "없음"}{" "}
-                · 우회 구간 {game.detours} · 확보 경로 통과 {game.crossings}
+                · 통제 우회 선택 {game.detours} · 주의·확보 경로 통과{" "}
+                {game.crossings}
+              </p>
+              <p>
+                기상 대응:{" "}
+                {game.insulated ? "방한포로 노출 완화" : "보온 장비 미적용"} ·{" "}
+                {game.evacuated
+                  ? "기상 확인 후 항공 인계"
+                  : game.heliUses
+                    ? "항공 요청 후 지상 상황 대응"
+                    : "지상 작전"}
+                . 실제 이동별 날씨와 비용은 아래 판단 기록에서 확인하세요.
               </p>
               <p>
                 장비:{" "}

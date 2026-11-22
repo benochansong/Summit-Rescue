@@ -851,6 +851,14 @@ input[type="checkbox"] {
 .weather-rain .terrain {
   filter: brightness(0.8);
 }
+.weather-cloudy .terrain,
+.weather-drizzle .terrain {
+  filter: brightness(0.9);
+}
+.weather-drizzle .rain-overlay {
+  opacity: 0.35;
+  animation-duration: 1.5s;
+}
 .weather-snow .terrain {
   background: #62766e;
 }

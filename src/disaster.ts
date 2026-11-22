@@ -1,7 +1,7 @@
 import { createGame, type Game, type Cost } from "./game";
 import { adjacent, connection, point, regionFor } from "./regions";
 import { decayHealth } from "./casualties";
-import type { Equipment } from "./conditions";
+import { weatherInfo, type Equipment } from "./conditions";
 import type { SkillLevels } from "./progression";
 import type { Difficulty } from "./experience";
 import {
@@ -41,6 +41,7 @@ export type DisasterAction =
       type:
         | "search"
         | "rest"
+        | "wait"
         | "aid"
         | "kit"
         | "blanket"
@@ -176,7 +177,13 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
         ) *
           (g.found ? 1.6 : 1) *
           p.energy *
-          (w === "rain" ? 1.3 : w === "snow" ? 1.2 : 1) +
+          (w === "rain"
+            ? 1.3
+            : w === "snow"
+              ? 1.2
+              : w === "drizzle"
+                ? 1.1
+                : 1) +
           (river && w === "rain" ? 3 : 0),
       ),
     };
@@ -190,6 +197,7 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
       energy: 6,
     };
   if (a.type === "rest") return { time: 15, energy: -25 };
+  if (a.type === "wait") return { time: 10, energy: 0 };
   if (a.type === "aid" || a.type === "kit") return { time: 10, energy: 3 };
   if (a.type === "blanket") return { time: 5, energy: 1 };
   if (a.type === "mitigate")
@@ -419,6 +427,23 @@ function updateWorld(g: DisasterGame): DisasterGame {
       "storm",
     ],
   ];
+  for (const step of disasterSchedule(g.difficulty, g.seed).slice(1)) {
+    thresholds.push([
+      `forecast-${step.at}`,
+      Math.max(0, step.at - 20),
+      `기상 예보: +${step.at}분부터 ${weatherInfo[step.weather].name}. ${weatherInfo[step.weather].detail}.`,
+    ]);
+    thresholds.push([
+      `weather-${step.at}`,
+      step.at,
+      `기상 관측: ${weatherInfo[step.weather].name} 전환. ${weatherInfo[step.weather].detail}.`,
+    ]);
+  }
+  thresholds.push([
+    "flood-receded",
+    t.flood + 45,
+    "계곡 수위 하강. 미확보 계곡 진입로는 주의 통행으로 전환됐습니다.",
+  ]);
   for (const [id, at, message, scene] of thresholds.sort((a, b) => a[1] - b[1]))
     if (g.elapsed >= at && !events.includes(id)) {
       events.push(id);
@@ -532,13 +557,50 @@ export function disasterTransition(
     const c = disasterCost(g, a);
     n = spend(n, c);
     if (a.type === "move") {
-      if (
-        g.events.includes("rock") &&
-        edgeKey(g.position, a.to) !== edgeKey("fork", "cave") &&
-        ["hut", "spring", "summit", "east", "waterfall"].includes(a.to)
-      )
+      const goal = g.found
+        ? "base"
+        : g.possible.length === 1
+          ? g.possible[0]
+          : "lookout";
+      const normal = safeRoute(
+        {
+          ...g,
+          cleared: [
+            edgeKey("fork", "cave"),
+            edgeKey("fork", "valley"),
+            edgeKey("bridge", "valley"),
+          ],
+        },
+        g.position,
+        goal,
+      );
+      const available = safeRoute(g, g.position, goal);
+      if (normal?.length && available?.[0] === a.to && normal[0] !== a.to) {
         n.detours++;
-      if (g.cleared.includes(edgeKey(g.position, a.to))) n.crossings++;
+        n.routeReport = [
+          ...n.routeReport,
+          `통제 우회 선택: ${point(g.position, 7).name} → ${point(a.to, 7).name} · 목표 ${point(goal, 7).name}`,
+        ];
+      }
+      const key = edgeKey(g.position, a.to),
+        state = edgeState(g, g.position, a.to);
+      if (
+        g.cleared.includes(key) ||
+        (g.reopened[key] ?? -1) > g.elapsed ||
+        state === "warning"
+      ) {
+        n.crossings++;
+        n.routeReport = [
+          ...n.routeReport,
+          `${state === "warning" ? "주의" : "확보"} 경로 통과: ${point(g.position, 7).name} → ${point(a.to, 7).name}`,
+        ];
+      }
+      const w = disasterWeather(g);
+      if (!["clear", "cloudy"].includes(w))
+        n.routeReport = [
+          ...n.routeReport,
+          `${weatherInfo[w].name} 이동: ${point(g.position, 7).name} → ${point(a.to, 7).name} · ${c.time}분 / 체력 ${c.energy}`,
+        ];
       n.position = a.to;
       n.trail = [...g.trail, a.to];
       n.visited = [...new Set([...g.visited, a.to])];
@@ -567,7 +629,13 @@ export function disasterTransition(
       n.kitUses++;
       n.health = Math.min(100, n.health + 25);
     }
-    if (a.type === "blanket") n.insulated = true;
+    if (a.type === "blanket") {
+      n.insulated = true;
+      n.routeReport = [
+        ...n.routeReport,
+        `기상 대비: +${n.elapsed}분 방한포 적용 · 이후 추위·야간 노출 감소`,
+      ];
+    }
     if (a.type === "mitigate") {
       const key = edgeKey(g.position, a.to),
         rock = edgeState(g, g.position, a.to) === "blocked";
@@ -592,7 +660,7 @@ export function disasterTransition(
     !n.action
   )
     n.log = [
-      `${a.type === "move" ? point(n.position, 7).name + " 이동" : a.type === "search" ? "현장 수색" : a.type === "rest" ? "휴식" : a.type === "aid" ? "응급처치" : a.type === "blanket" ? "보온" : a.type === "kit" ? "키트 사용" : a.type === "mitigate" ? "경로 확보" : a.type === "helicopter" ? "헬기 출동 요청" : "현장 작업 완료"} · +${n.elapsed - g.elapsed}분 · 체력 ${n.stamina - g.stamina >= 0 ? "+" : ""}${n.stamina - g.stamina}`,
+      `${a.type === "move" ? point(n.position, 7).name + " 이동" : a.type === "search" ? "현장 수색" : a.type === "rest" ? "휴식" : a.type === "wait" ? "현장 대기" : a.type === "aid" ? "응급처치" : a.type === "blanket" ? "보온" : a.type === "kit" ? "키트 사용" : a.type === "mitigate" ? "경로 확보" : a.type === "helicopter" ? "헬기 출동 요청" : "현장 작업 완료"} · +${n.elapsed - g.elapsed}분 · 체력 ${n.stamina - g.stamina >= 0 ? "+" : ""}${n.stamina - g.stamina}`,
       ...n.log,
     ].slice(0, 30);
   return updateWorld(n);

@@ -302,7 +302,7 @@ export default function App() {
     if (mission === 7) {
       setDisaster(
         createDisaster(
-          seedInput.trim() ? Number(seedInput) >>> 0 : Date.now(),
+          Number(seedInput) >>> 0,
           disasterDifficulty,
           loadout,
           readCareer().skills,
@@ -492,6 +492,7 @@ export default function App() {
                 className="disaster-start"
                 onClick={() => {
                   setMission(7);
+                  if (!seedInput.trim()) setSeedInput(String(Date.now() >>> 0));
                   setPractice(false);
                   setLoadout([...recommendations[7]]);
                   setScreen("briefing");
@@ -528,6 +529,8 @@ export default function App() {
             setPractice(training);
             setLoadout([...recommendations[id]]);
             setMission(id);
+            if (id === 7 && !seedInput.trim())
+              setSeedInput(String(Date.now() >>> 0));
             setScreen("briefing");
           }}
         />

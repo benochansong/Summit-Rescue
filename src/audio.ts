@@ -72,7 +72,13 @@ export class RescueAudio {
     if (!ctx || !this.ambient || !this.filter) return;
     try {
       this.filter.frequency.setTargetAtTime(
-        weather === "rain" ? 2100 : weather === "wind" ? 1000 : 550,
+        weather === "rain"
+          ? 2100
+          : weather === "drizzle"
+            ? 1400
+            : weather === "wind"
+              ? 1000
+              : 550,
         ctx.currentTime,
         0.2,
       );
