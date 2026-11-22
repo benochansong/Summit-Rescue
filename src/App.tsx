@@ -1,4 +1,7 @@
 import { ExperienceSetup, ExperienceBar } from "./ExperiencePanels";
+import DisasterScreen, { DisasterSetup } from "./DisasterScreen";
+import { createDisaster } from "./disaster";
+import { disasterProfiles } from "./disasterData";
 import {
   actionFeedback,
   difficulties,
@@ -9,6 +12,7 @@ import {
   failureTip,
   type ExperienceOptions,
   type Feedback,
+  type Difficulty,
 } from "./experience";
 import { RescueAudio } from "./audio";
 import CommandScreen, {
@@ -149,8 +153,12 @@ export default function App() {
     | "help"
     | "settings"
     | "command"
+    | "disaster"
   >("menu");
   const [formation, setFormation] = useState(initialFormation);
+  const [disasterDifficulty, setDisasterDifficulty] =
+    useState<Difficulty>("normal");
+  const [disaster, setDisaster] = useState(() => createDisaster());
   const [command, setCommand] = useState(() => createCommand());
   const [experienceOptions, setExperienceOptions] = useState<ExperienceOptions>(
     { story: "alone", difficulty: "easy" },
@@ -291,6 +299,20 @@ export default function App() {
     beep("radio");
   }
   function start() {
+    if (mission === 7) {
+      setDisaster(
+        createDisaster(
+          seedInput.trim() ? Number(seedInput) >>> 0 : Date.now(),
+          disasterDifficulty,
+          loadout,
+          readCareer().skills,
+          practice,
+        ),
+      );
+      setScreen("disaster");
+      beep();
+      return;
+    }
     if (mission === 6) {
       setCommand(
         createCommand(
@@ -389,6 +411,16 @@ export default function App() {
       </button>
     );
   };
+  if (screen === "disaster")
+    return (
+      <DisasterScreen
+        key={disaster.runId}
+        initial={disaster}
+        settings={settings}
+        onSettings={setSettings}
+        onExit={() => setScreen("missions")}
+      />
+    );
   if (screen === "command")
     return (
       <CommandScreen
@@ -456,6 +488,17 @@ export default function App() {
               >
                 모든 임무 · 이야기와 난이도 선택
               </button>
+              <button
+                className="disaster-start"
+                onClick={() => {
+                  setMission(7);
+                  setPractice(false);
+                  setLoadout([...recommendations[7]]);
+                  setScreen("briefing");
+                }}
+              >
+                △ 신규 작전 · 폭풍 속 마지막 구조
+              </button>
               <div className="menu-secondary">
                 <button onClick={() => setScreen("records")}>구조 기록</button>
                 <button onClick={() => setScreen("help")}>게임 방법</button>
@@ -474,7 +517,7 @@ export default function App() {
           </div>
           <footer className="menu-footer">
             <span>산을 읽고. 흔적을 따라. 함께 돌아오다.</span>
-            <span>HEART OF RESCUE · 05</span>
+            <span>DISASTER & ACTION · 06</span>
           </footer>
         </main>
       )}
@@ -512,6 +555,12 @@ export default function App() {
               onChange={setExperienceOptions}
             />
           )}
+          {mission === 7 && (
+            <DisasterSetup
+              value={disasterDifficulty}
+              onChange={setDisasterDifficulty}
+            />
+          )}
           <div className="briefing-grid">
             <section className="panel">
               <div className="section-title">▥ 수신된 무전</div>
@@ -528,7 +577,9 @@ export default function App() {
                   <strong>
                     {mission === 1
                       ? difficulties[experienceOptions.difficulty].limit
-                      : briefingMission.limit}{" "}
+                      : mission === 7
+                        ? disasterProfiles[disasterDifficulty].limit
+                        : briefingMission.limit}{" "}
                     <em>분</em>
                   </strong>
                 </div>
@@ -543,7 +594,9 @@ export default function App() {
                   <strong>
                     {mission === 1
                       ? difficulties[experienceOptions.difficulty].name
-                      : briefingMission.difficulty}
+                      : mission === 7
+                        ? disasterProfiles[disasterDifficulty].name
+                        : briefingMission.difficulty}
                   </strong>
                 </div>
               </div>
@@ -577,6 +630,7 @@ export default function App() {
               setLoadout={setLoadout}
               mission={mission}
               experience={mission === 1 ? experienceOptions : undefined}
+              disasterDifficulty={disasterDifficulty}
               seed={seedInput}
               setSeed={setSeedInput}
             />

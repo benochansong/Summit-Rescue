@@ -3,7 +3,9 @@ import {
   gameForecast,
   gameSchedule,
   type ExperienceOptions,
+  type Difficulty,
 } from "./experience";
+import { disasterSchedule } from "./disasterData";
 import { useState } from "react";
 import { regionFor } from "./regions";
 import {
@@ -185,12 +187,14 @@ export function Loadout({
   seed,
   setSeed,
   experience,
+  disasterDifficulty,
 }: {
   loadout: Equipment[];
   setLoadout: (items: Equipment[]) => void;
   mission: MissionId;
   seed: string;
   experience?: ExperienceOptions;
+  disasterDifficulty?: Difficulty;
   setSeed: (value: string) => void;
 }) {
   return (
@@ -260,18 +264,20 @@ export function Loadout({
         <span>같은 숫자는 같은 조난자 위치를 재현합니다.</span>
       </label>
       <div className="forecast-timeline">
-        {(experience
-          ? gameSchedule({
-              mission,
-              seed: Number(seed) >>> 0,
-              experience: {
-                ...experience,
-                clueStage: 0,
-                prepared: false,
-                frontAnnounced: false,
-              },
-            })
-          : schedule(mission, Number(seed) || 0)
+        {(mission === 7
+          ? disasterSchedule(disasterDifficulty ?? "normal", Number(seed) >>> 0)
+          : experience
+            ? gameSchedule({
+                mission,
+                seed: Number(seed) >>> 0,
+                experience: {
+                  ...experience,
+                  clueStage: 0,
+                  prepared: false,
+                  frontAnnounced: false,
+                },
+              })
+            : schedule(mission, Number(seed) || 0)
         ).map((p) => (
           <span key={p.at}>
             <b>{p.at === 0 ? "출동" : `+${p.at}분`}</b>

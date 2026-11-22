@@ -43,6 +43,7 @@ export default function MountainMap({
   weather = "clear",
   animate = true,
   command,
+  tactical,
 }: {
   game: Game;
   selected: string;
@@ -51,11 +52,21 @@ export default function MountainMap({
   weather?: string;
   animate?: boolean;
   command?: CommandGame;
+  tactical?: {
+    states: Record<string, string>;
+    route: string[];
+    cost: (to: string) => { time: number; energy: number };
+    helicopter?: { target: string; progress: number };
+  };
 }) {
   const region = regionFor(game.mission),
     points = region.points,
     edges = region.edges;
-  const night = game.mission === 5 && game.elapsed >= missions[5].sunset;
+  const night =
+    (game.mission === 5 || game.mission === 7) &&
+    game.elapsed >= missions[game.mission].sunset;
+  const routeState = (a: string, b: string) =>
+    tactical?.states[[a, b].sort().join("~")] ?? "open";
   const visible = new Set([
     ...game.visited,
     ...adjacent(game.position, game.mission),
@@ -90,7 +101,9 @@ export default function MountainMap({
     ...point(id, game.mission),
     y: point(id, game.mission).y * verticalScale,
   });
-  const neighbors = adjacent(game.position, game.mission);
+  const neighbors = adjacent(game.position, game.mission).filter(
+    (id) => !["blocked", "restricted"].includes(routeState(game.position, id)),
+  );
   const trailLength = useRef(game.trail.length);
   const [marker, setMarker] = useState({ id: game.position, duration: 650 });
   useEffect(() => {
@@ -113,7 +126,7 @@ export default function MountainMap({
   const here = mapPoint(marker.id);
   return (
     <div
-      className={`map-wrap region-${region.theme} weather-${weather} ${night ? "is-night" : ""}`}
+      className={`map-wrap region-${region.theme} weather-${weather} ${night ? "is-night" : ""} ${game.mission === 7 && game.elapsed >= 150 && game.elapsed < 190 ? "is-sunset" : ""}`}
     >
       <div className="map-heading">
         <span className="eyebrow">작전 구역 · {region.name}</span>
@@ -301,10 +314,50 @@ export default function MountainMap({
             />
           </>
         )}
+        {tactical && (
+          <g pointerEvents="none" transform={`scale(1 ${verticalScale})`}>
+            {tactical.states["cave~fork"] === "blocked" && (
+              <g className="map-rockfall">
+                <ellipse
+                  cx="625"
+                  cy="320"
+                  rx="70"
+                  ry="34"
+                  fill="#cdbd9a"
+                  opacity=".15"
+                />
+                <g className="falling-rocks" fill="#b1ac96">
+                  <path d="M610 280l13-8 16 12-7 18-22-5Z" />
+                  <path d="M642 316l11-6 14 11-8 17-16-6Z" />
+                  <path d="M590 330l8-8 15 5-4 16-17-2Z" />
+                </g>
+              </g>
+            )}
+            {Object.values(tactical.states).includes("restricted") && (
+              <path
+                className="rising-water"
+                d="M960 300Q865 320 840 410T740 510Q690 560 770 610T805 800"
+                stroke="#72c6d1"
+                strokeWidth="26"
+                opacity=".24"
+                fill="none"
+              />
+            )}
+          </g>
+        )}
         {edges.map((e) => {
           const a = mapPoint(e.a),
             b = mapPoint(e.b);
-          const available = e.a === game.position || e.b === game.position;
+          const state = routeState(e.a, e.b),
+            closed = ["blocked", "restricted"].includes(state);
+          const available =
+            !closed && (e.a === game.position || e.b === game.position);
+          const alternative = [game.position, ...(tactical?.route ?? [])].some(
+            (p, i, list) =>
+              i > 0 &&
+              ((p === e.a && list[i - 1] === e.b) ||
+                (p === e.b && list[i - 1] === e.a)),
+          );
           const visited = game.trail.some(
             (p, i) =>
               i > 0 &&
@@ -327,22 +380,49 @@ export default function MountainMap({
                 d={`M${a.x} ${a.y}L${b.x} ${b.y}`}
                 fill="none"
                 stroke={
-                  e.ropeOnlyInWind &&
-                  weather === "wind" &&
-                  !game.equipment.includes("rope")
-                    ? "#dd8f79"
-                    : available
-                      ? "#edc78d"
-                      : visited
-                        ? "#a7be9c"
-                        : e.steep
-                          ? "#b88b68"
-                          : "#89957c"
+                  closed
+                    ? "#e98369"
+                    : alternative
+                      ? "#9de0bd"
+                      : state === "warning"
+                        ? "#e7ba74"
+                        : e.ropeOnlyInWind &&
+                            weather === "wind" &&
+                            !game.equipment.includes("rope")
+                          ? "#dd8f79"
+                          : available
+                            ? "#edc78d"
+                            : visited
+                              ? "#a7be9c"
+                              : e.steep
+                                ? "#b88b68"
+                                : "#89957c"
                 }
-                strokeWidth={available ? 3 : 2}
-                strokeDasharray={visited ? "none" : e.steep ? "3 7" : "6 5"}
+                strokeWidth={closed || alternative ? 5 : available ? 3 : 2}
+                strokeDasharray={
+                  closed ? "4 8" : visited ? "none" : e.steep ? "3 7" : "6 5"
+                }
                 opacity={available ? 1 : 0.65}
               />
+              {closed && (
+                <g>
+                  <circle
+                    cx={(a.x + b.x) / 2}
+                    cy={(a.y + b.y) / 2}
+                    r="13"
+                    fill="#371e22"
+                  />
+                  <text
+                    x={(a.x + b.x) / 2}
+                    y={(a.y + b.y) / 2 + 5}
+                    fill="#ffb18c"
+                    textAnchor="middle"
+                    fontSize="18"
+                  >
+                    ×
+                  </text>
+                </g>
+              )}
             </g>
           );
         })}
@@ -428,8 +508,19 @@ export default function MountainMap({
                     fontSize="15"
                     fill="#f0cd98"
                   >
-                    {actionCost(game, { type: "move", to: p.id }).time}분 · 체력{" "}
-                    {actionCost(game, { type: "move", to: p.id }).energy}
+                    {
+                      (
+                        tactical?.cost(p.id) ??
+                        actionCost(game, { type: "move", to: p.id })
+                      ).time
+                    }
+                    분 · 체력{" "}
+                    {
+                      (
+                        tactical?.cost(p.id) ??
+                        actionCost(game, { type: "move", to: p.id })
+                      ).energy
+                    }
                   </text>
                 </g>
               )}
@@ -490,6 +581,44 @@ export default function MountainMap({
             </g>
           );
         })}
+        {tactical?.helicopter &&
+          (() => {
+            const dest = mapPoint(tactical.helicopter.target),
+              x = 100 + (dest.x - 100) * tactical.helicopter.progress,
+              y = 40 + (dest.y - 40) * tactical.helicopter.progress;
+            return (
+              <g
+                className="map-helicopter"
+                transform={`translate(${x} ${y})`}
+                aria-label="접근 중인 구조 헬기"
+              >
+                <path d="M-25-3h42l-7 18h-30Z" fill="#eeb273" />
+                <path
+                  d="M12-3l28-13M-38-12h70M-20 20h34"
+                  stroke="#dfebdd"
+                  strokeWidth="3"
+                />
+                <text y="42" textAnchor="middle" fill="#ffe3b5" fontSize="14">
+                  항공 지원 접근
+                </text>
+              </g>
+            );
+          })()}
+        {game.mission === 7 &&
+          ["lookout", "hut", "pine"].map((id) => {
+            const p = mapPoint(id);
+            return (
+              <text
+                key={id}
+                x={p.x - 23}
+                y={p.y - 15}
+                fill="#9edec1"
+                fontSize="18"
+              >
+                H
+              </text>
+            );
+          })}
         {!command && (
           <g
             className="rescue-marker"
