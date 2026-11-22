@@ -1,6 +1,14 @@
 import type { Feedback } from "./experience";
 import type { Weather } from "./conditions";
 type SoundSettings = { sound: boolean; volume: number };
+type AudioCue =
+  | Feedback["kind"]
+  | "rock"
+  | "flood"
+  | "storm"
+  | "helicopter"
+  | "rope"
+  | "carry";
 // Synthesized locally: no recordings, downloads or third-party audio licenses.
 export class RescueAudio {
   private ctx: AudioContext | null = null;
@@ -64,7 +72,13 @@ export class RescueAudio {
     if (!ctx || !this.ambient || !this.filter) return;
     try {
       this.filter.frequency.setTargetAtTime(
-        weather === "rain" ? 2100 : weather === "wind" ? 1000 : 550,
+        weather === "rain"
+          ? 2100
+          : weather === "drizzle"
+            ? 1400
+            : weather === "wind"
+              ? 1000
+              : 550,
         ctx.currentTime,
         0.2,
       );
@@ -83,10 +97,16 @@ export class RescueAudio {
       /* Keep the visual game running if the device is lost. */
     }
   }
-  play(kind: Feedback["kind"] = "radio") {
+  play(kind: AudioCue = "radio") {
     const ctx = this.start();
     if (!ctx || !this.master) return;
-    const notes: Record<Feedback["kind"], number[]> = {
+    const notes: Record<AudioCue, number[]> = {
+      rock: [90, 65, 45],
+      flood: [120, 150, 100],
+      storm: [60, 40, 55],
+      helicopter: [80, 100, 80, 100, 80, 100],
+      rope: [210, 250],
+      carry: [170, 140],
       move: [140, 110],
       clue: [540, 720],
       found: [440, 660, 880],

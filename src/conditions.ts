@@ -1,7 +1,8 @@
-export type Weather = "clear" | "cloudy" | "fog" | "rain" | "wind" | "snow";
+export type Weather =
+  "clear" | "cloudy" | "fog" | "drizzle" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
-export type MissionId = 1 | 2 | 3 | 4 | 5 | 6;
-export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6];
+export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7];
 export type CasualtyType = "lost" | "injured" | "cold";
 export const casualtyInfo = {
   lost: { name: "길을 잃은 등산객", detail: "기본 동행 비용 · 정보 수색 중심" },
@@ -64,11 +65,22 @@ export const weatherInfo: Record<
   clear: { name: "맑음", icon: "☀", detail: "14°C · 시야 양호" },
   cloudy: { name: "흐림", icon: "☁", detail: "10°C · 비구름 접근" },
   fog: { name: "안개", icon: "≋", detail: "8°C · 수색 +5분" },
+  drizzle: { name: "비", icon: "☂", detail: "7°C · 이동 체력 ×1.1" },
   rain: { name: "폭우", icon: "☂", detail: "5°C · 이동 체력 ×1.3" },
   wind: { name: "강풍", icon: "彡", detail: "2°C · 드론 비행 불가" },
   snow: { name: "폭설", icon: "❄", detail: "−4°C · 이동 시간 ×1.3" },
 };
 export const missions = {
+  7: {
+    name: "폭풍 속 마지막 구조",
+    subtitle: "산이 변하면, 구조 작전도 변해야 한다",
+    limit: 400,
+    start: 14 * 60 + 10,
+    sunset: 190,
+    difficulty: "재난 · 액션",
+    description:
+      "백운산 북쪽 암릉에서 이재하 씨의 연락이 끊겼습니다. 제2전망대에서 방향 신호를 분석하십시오. 낙석과 계곡 수위 상승이 예보됐습니다. 현장 로프 구조와 부상자 이송 후, 지상 귀환 또는 기상이 허용하는 헬기 이송을 결정하십시오.",
+  },
   6: {
     name: "두 개의 구조 신호",
     subtitle: "세 사람의 판단, 하나의 구조 작전",
@@ -133,6 +145,7 @@ export const missions = {
 export const missionType = (id: MissionId): CasualtyType =>
   id === 4 ? "injured" : id === 5 ? "cold" : "lost";
 export const recommendations: Record<MissionId, Equipment[]> = {
+  7: ["rope", "kit", "blanket"],
   6: ["drone", "kit", "rope"],
   1: ["kit", "blanket", "rope"],
   2: ["kit", "blanket", "rope"],
@@ -141,6 +154,7 @@ export const recommendations: Record<MissionId, Equipment[]> = {
   5: ["lantern", "blanket", "kit"],
 };
 export const evaluationRules: Record<MissionId, string> = {
+  7: "3별: 안전 인계·생존 60 이상·제한 시간 85% 이내 / 2별: 생존 35 이상 · 자동 구조도 같은 평가",
   6: "S: 2명 구조·대원 전원 안전·230분 이내·생존 50 이상 / A: 2명 구조·전원 안전 / B: 1명 구조 / C: 미달성",
   1: "3별: 생존 65 이상·162분 이내 / 2별: 생존 40 이상",
   2: "3별: 생존 65 이상·252분 이내 / 2별: 생존 40 이상",
@@ -152,45 +166,66 @@ export const schedule = (
   mission: MissionId,
   seed = 0,
 ): { at: number; weather: Weather }[] =>
-  mission === 6
+  mission === 7
     ? [
         { at: 0, weather: "clear" },
-        { at: 90 + (Math.floor(seed / 9) % 3) * 5, weather: "rain" },
-        { at: 150 + (Math.floor(seed / 9) % 3) * 5, weather: "wind" },
-        { at: 210 + (Math.floor(seed / 9) % 3) * 5, weather: "clear" },
-        { at: 290 + (Math.floor(seed / 9) % 3) * 5, weather: "fog" },
+        { at: 30, weather: "cloudy" },
+        { at: 100, weather: "rain" },
+        { at: 155, weather: "wind" },
+        { at: 220, weather: "clear" },
+        { at: 315, weather: "snow" },
       ]
-    : mission === 1
-      ? [{ at: 0, weather: "clear" }]
-      : mission === 2
-        ? [
-            { at: 0, weather: "cloudy" },
-            { at: 35, weather: "fog" },
-            { at: 70, weather: "rain" },
-            { at: 130, weather: "wind" },
-            { at: 190, weather: "snow" },
-          ]
-        : mission === 3
+    : mission === 6
+      ? [
+          { at: 0, weather: "clear" },
+          { at: 90 + (Math.floor(seed / 9) % 3) * 5, weather: "rain" },
+          { at: 150 + (Math.floor(seed / 9) % 3) * 5, weather: "wind" },
+          { at: 210 + (Math.floor(seed / 9) % 3) * 5, weather: "clear" },
+          { at: 290 + (Math.floor(seed / 9) % 3) * 5, weather: "fog" },
+        ]
+      : mission === 1
+        ? [{ at: 0, weather: "clear" }]
+        : mission === 2
           ? [
-              { at: 0, weather: "fog" },
-              { at: 120 + (Math.floor(seed / 3) % 3) * 10, weather: "cloudy" },
-              { at: 200 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
+              { at: 0, weather: "cloudy" },
+              { at: 35, weather: "fog" },
+              { at: 70, weather: "rain" },
+              { at: 130, weather: "wind" },
+              { at: 190, weather: "snow" },
             ]
-          : mission === 4
+          : mission === 3
             ? [
-                { at: 0, weather: "wind" },
-                { at: 90 + (Math.floor(seed / 3) % 3) * 10, weather: "cloudy" },
-                { at: 160 + (Math.floor(seed / 3) % 3) * 10, weather: "wind" },
+                { at: 0, weather: "fog" },
                 {
-                  at: 240 + (Math.floor(seed / 3) % 3) * 10,
+                  at: 120 + (Math.floor(seed / 3) % 3) * 10,
                   weather: "cloudy",
                 },
+                { at: 200 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
               ]
-            : [
-                { at: 0, weather: "cloudy" },
-                { at: 65 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
-                { at: 150 + (Math.floor(seed / 3) % 3) * 10, weather: "clear" },
-              ];
+            : mission === 4
+              ? [
+                  { at: 0, weather: "wind" },
+                  {
+                    at: 90 + (Math.floor(seed / 3) % 3) * 10,
+                    weather: "cloudy",
+                  },
+                  {
+                    at: 160 + (Math.floor(seed / 3) % 3) * 10,
+                    weather: "wind",
+                  },
+                  {
+                    at: 240 + (Math.floor(seed / 3) % 3) * 10,
+                    weather: "cloudy",
+                  },
+                ]
+              : [
+                  { at: 0, weather: "cloudy" },
+                  { at: 65 + (Math.floor(seed / 3) % 3) * 10, weather: "fog" },
+                  {
+                    at: 150 + (Math.floor(seed / 3) % 3) * 10,
+                    weather: "clear",
+                  },
+                ];
 export const weatherAt = (
   mission: MissionId,
   elapsed: number,

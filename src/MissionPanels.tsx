@@ -3,7 +3,9 @@ import {
   gameForecast,
   gameSchedule,
   type ExperienceOptions,
+  type Difficulty,
 } from "./experience";
+import { disasterSchedule } from "./disasterData";
 import { useState } from "react";
 import { regionFor } from "./regions";
 import {
@@ -53,7 +55,7 @@ export function MissionSelect({
           <h2>구조대 훈련</h2>
           <strong className="orange">보유 경험치 {career.xp}</strong>
           <p>
-            임무 1~5 성공 시 100 + 별당 25 경험치. 임무 6은 S/A/B등급에
+            임무 1~5·7 성공 시 100 + 별당 25 경험치. 임무 6은 S/A/B등급에
             200/150/75. 각 능력은 최대 3단계입니다.
           </p>
         </div>
@@ -185,12 +187,14 @@ export function Loadout({
   seed,
   setSeed,
   experience,
+  disasterDifficulty,
 }: {
   loadout: Equipment[];
   setLoadout: (items: Equipment[]) => void;
   mission: MissionId;
   seed: string;
   experience?: ExperienceOptions;
+  disasterDifficulty?: Difficulty;
   setSeed: (value: string) => void;
 }) {
   return (
@@ -218,7 +222,10 @@ export function Loadout({
             <button
               key={item.id}
               aria-pressed={selected}
-              disabled={!selected && loadout.length >= 3}
+              disabled={
+                (!selected && loadout.length >= 3) ||
+                (mission === 7 && item.id === "drone")
+              }
               className={`equipment-card ${selected ? "selected" : ""}`}
               onClick={() =>
                 setLoadout(
@@ -233,8 +240,16 @@ export function Loadout({
                 {item.name}
                 <i>{selected ? "✓" : "+"}</i>
               </strong>
-              <span>{item.effect}</span>
-              <small>{item.tip}</small>
+              <span>
+                {mission === 7 && item.id === "drone"
+                  ? "이 작전에서는 사용하지 않음"
+                  : item.effect}
+              </span>
+              <small>
+                {mission === 7 && item.id === "drone"
+                  ? "전망대의 지상 신호 탐지를 사용합니다. 드론 지휘는 임무 6에서 가능합니다."
+                  : item.tip}
+              </small>
             </button>
           );
         })}
@@ -253,25 +268,27 @@ export function Loadout({
           min="0"
           max="4294967295"
           step="1"
-          placeholder="자동 생성"
+          placeholder={mission === 7 ? "비우면 0" : "자동 생성"}
           value={seed}
           onChange={(e) => setSeed(e.target.value)}
         />
         <span>같은 숫자는 같은 조난자 위치를 재현합니다.</span>
       </label>
       <div className="forecast-timeline">
-        {(experience
-          ? gameSchedule({
-              mission,
-              seed: Number(seed) >>> 0,
-              experience: {
-                ...experience,
-                clueStage: 0,
-                prepared: false,
-                frontAnnounced: false,
-              },
-            })
-          : schedule(mission, Number(seed) || 0)
+        {(mission === 7
+          ? disasterSchedule(disasterDifficulty ?? "normal", Number(seed) >>> 0)
+          : experience
+            ? gameSchedule({
+                mission,
+                seed: Number(seed) >>> 0,
+                experience: {
+                  ...experience,
+                  clueStage: 0,
+                  prepared: false,
+                  frontAnnounced: false,
+                },
+              })
+            : schedule(mission, Number(seed) || 0)
         ).map((p) => (
           <span key={p.at}>
             <b>{p.at === 0 ? "출동" : `+${p.at}분`}</b>

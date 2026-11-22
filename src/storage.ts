@@ -91,6 +91,7 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
     "4": emptyStats(),
     "5": emptyStats(),
     "6": emptyStats(),
+    "7": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -155,7 +156,11 @@ function readStore(): Store {
 export function readRecords(): RecordEntry[] {
   return readStore().records;
 }
-export function saveRecord(game: Game, mission = game.mission): boolean {
+export function saveRecord(
+  game: Game,
+  mission = game.mission,
+  details: { difficulty?: Difficulty; rating?: number } = {},
+): boolean {
   if (game.status === "active") return false;
   if (game.practice) return true;
   try {
@@ -170,17 +175,22 @@ export function saveRecord(game: Game, mission = game.mission): boolean {
       health: Math.round(game.health),
       stamina: game.stamina,
       clues: game.clues.length,
-      stars: stars(game),
+      stars: details.rating ?? stars(game),
       date: new Date().toLocaleDateString("ko-KR"),
-      xp: earnedXp(game),
+      xp:
+        details.rating === undefined
+          ? earnedXp(game)
+          : game.status === "success"
+            ? 100 + details.rating * 25
+            : 0,
       routes: game.routeReport,
-      difficulty: game.experience?.difficulty,
+      difficulty: details.difficulty ?? game.experience?.difficulty,
       story: game.experience?.story,
     };
     store.records = [record, ...store.records].slice(0, 100);
     store.bests = improveBest(store.bests, record);
     store.totals[mission] = addWin(store.totals[mission], record);
-    store.career = { ...store.career, xp: store.career.xp + earnedXp(game) };
+    store.career = { ...store.career, xp: store.career.xp + (record.xp ?? 0) };
     localStorage.setItem(KEY, JSON.stringify(store));
     return true;
   } catch {
@@ -200,6 +210,7 @@ export function isUnlocked(mission: number): boolean {
   const totals = readStore().totals;
   return (
     mission === 1 ||
+    mission === 7 ||
     !!totals[mission]?.completed ||
     !!totals[mission - 1]?.completed
   );
@@ -382,6 +393,7 @@ export function personalHighlights(
     | "stamina"
   >,
   rating: number,
+  difficulty?: Difficulty,
 ): string[] {
   if (g.status !== "success" || g.practice) return [];
   const best =
@@ -389,7 +401,7 @@ export function personalHighlights(
       recordKey({
         mission: g.mission,
         story: g.experience?.story,
-        difficulty: g.experience?.difficulty,
+        difficulty: difficulty ?? g.experience?.difficulty,
       })
     ];
   if (!best) return ["이 조건의 첫 구조 기록"];

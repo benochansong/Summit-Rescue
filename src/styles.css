@@ -851,6 +851,14 @@ input[type="checkbox"] {
 .weather-rain .terrain {
   filter: brightness(0.8);
 }
+.weather-cloudy .terrain,
+.weather-drizzle .terrain {
+  filter: brightness(0.9);
+}
+.weather-drizzle .rain-overlay {
+  opacity: 0.35;
+  animation-duration: 1.5s;
+}
 .weather-snow .terrain {
   background: #62766e;
 }
@@ -2827,4 +2835,629 @@ html[data-motion="off"] .discovery .story-voice,
 html[data-motion="off"] .discovery .discovery-health,
 html[data-motion="off"] .discovery-ring {
   animation: none;
+}
+
+/* Phase 6: the strategic map remains visible beneath short field scenes. */
+.disaster-start {
+  border-color: #bf8b5b88;
+  background: #203334;
+  margin-top: 8px;
+  color: #f0c694;
+  font-size: 0.85rem;
+}
+.disaster-setup {
+  margin: 25px 0;
+}
+.disaster-setup .difficulty-choices {
+  margin: 20px 0;
+}
+.disaster-operation {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px 32px 40px;
+}
+.disaster-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.disaster-heading h1 {
+  font-size: clamp(1.4rem, 2.4vw, 2.3rem);
+  margin: 10px 0;
+}
+.disaster-hud {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+  flex-shrink: 0;
+}
+.disaster-hud span {
+  font-size: 0.7rem;
+  color: #9eafa7;
+}
+.disaster-hud b {
+  display: block;
+  font-size: 1.4rem;
+  color: #e6ecda;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.disaster-settings {
+  display: flex;
+  gap: 10px;
+}
+.disaster-settings button {
+  padding: 7px 11px;
+  font-size: 0.75rem;
+}
+.disaster-forecast {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 14px 20px;
+  border: 1px solid #a5c1ae22;
+  border-radius: 8px;
+  background: #1c3234;
+  font-size: 0.85rem;
+  color: #bed0c0;
+}
+.disaster-forecast small {
+  margin-left: auto;
+  color: #8ba69b;
+}
+.disaster-objective {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 15px 0 18px;
+}
+.disaster-objective strong {
+  font-size: 1rem;
+}
+.disaster-objective > span:last-child {
+  font-size: 0.75rem;
+  color: #9bb9a5;
+  flex-basis: 100%;
+  line-height: 1.7;
+}
+.disaster-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 20px;
+  align-items: start;
+}
+.disaster-map-column {
+  min-width: 0;
+  position: sticky;
+  top: 12px;
+}
+.disaster-map-column .map-wrap {
+  height: clamp(400px, 49vh, 640px);
+  border: 1px solid #a4baa42c;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.disaster-map-column .terrain {
+  height: 100%;
+  min-height: 0;
+}
+.disaster-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.disaster-sidebar .panel {
+  padding: 19px;
+}
+.disaster-sidebar h2 {
+  font-size: 1rem;
+  margin: 10px 0;
+}
+.disaster-sidebar p,
+.disaster-sidebar small {
+  font-size: 0.78rem;
+  line-height: 1.8;
+  color: #b4c4b7;
+}
+.disaster-sidebar .eyebrow {
+  font-size: 0.66rem;
+}
+.hazard-status {
+  border-left: 3px solid #cb9568;
+}
+.disaster-movement {
+  margin-top: 14px;
+  padding: 18px;
+}
+.disaster-movement label {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  font-size: 0.8rem;
+}
+.disaster-movement select,
+.action-scene select {
+  flex: 1;
+  min-width: 0;
+  padding: 10px;
+  background: #10292c;
+  border: 1px solid #69877955;
+  border-radius: 6px;
+  color: #e2e9dc;
+}
+.disaster-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+.disaster-controls button,
+.field-buttons button,
+.air-panel > button {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 6px;
+  font-size: 0.82rem;
+}
+.disaster-controls small,
+.field-buttons small {
+  font-size: 0.68rem;
+  color: inherit;
+  opacity: 0.8;
+}
+.movement-reason {
+  font-size: 0.74rem;
+  color: #cbbd97;
+  margin: 12px 0 0;
+  line-height: 1.7;
+}
+.route-response {
+  border-top: 1px solid #d9905b55;
+  margin-top: 15px;
+  padding-top: 16px;
+  color: #e3ba8d;
+}
+.route-response p {
+  font-size: 0.8rem;
+  line-height: 1.8;
+}
+.field-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+.air-panel > button {
+  width: 100%;
+  margin-top: 12px;
+}
+.air-panel progress {
+  width: 100%;
+  accent-color: #efb06f;
+}
+.disaster-radio [role="status"] {
+  margin-top: 12px;
+  line-height: 1.8;
+  font-size: 0.8rem;
+  color: #c5d3c3;
+}
+.disaster-radio details {
+  font-size: 0.75rem;
+  margin-top: 15px;
+}
+.disaster-radio details p {
+  border-top: 1px solid #8da99322;
+  padding-top: 10px;
+}
+.disaster-app .modal {
+  width: min(680px, 100%);
+}
+.disaster-app .cinematic {
+  padding: 28px;
+  text-align: left;
+}
+.cinematic h2,
+.action-scene h2 {
+  margin: 12px 0 18px;
+}
+.cinematic .primary {
+  margin-top: 20px;
+}
+.rescue-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 255px;
+  border-radius: 8px;
+  background: #1e353a;
+  overflow: hidden;
+}
+.cinematic .rescue-illustration {
+  animation: field-reveal 2.2s ease-out;
+}
+.cinematic-rock {
+  animation: rock-shake 0.45s ease-out !important;
+}
+.falling-rocks {
+  animation: rocks-fall 1.8s ease-out both;
+}
+.rising-water {
+  stroke-dasharray: 40 14;
+  animation: water-rush 1.2s linear infinite;
+}
+.scene-water {
+  stroke-dasharray: 80 12;
+  animation: water-rush 3s linear infinite;
+}
+.scene-helicopter {
+  animation: heli-arrival 2.8s ease-out both;
+}
+.map-helicopter {
+  transition: transform 0.7s ease-out;
+}
+.rope-rescuer {
+  animation: rope-sway 2.5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+.disaster-app .weather-wind .forest {
+  animation: tree-wind 2s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+.disaster-app .weather-snow {
+  filter: saturate(0.65);
+  box-shadow: inset 0 0 90px #c9e2ed44;
+}
+.disaster-app .weather-rain {
+  box-shadow: inset 0 0 100px #071b2b66;
+}
+.disaster-app .is-sunset {
+  box-shadow: inset 0 0 160px #e6904c44;
+}
+.disaster-app .is-night {
+  box-shadow: inset 0 0 180px #020d18aa;
+}
+.action-scene {
+  padding: 25px 30px;
+}
+.action-scene .rescue-illustration {
+  max-height: 190px;
+}
+.action-scene p {
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+.action-scene > small {
+  display: block;
+  font-size: 0.72rem;
+  color: #9cae9f;
+  line-height: 1.6;
+}
+.action-progress {
+  display: block;
+  margin-top: 14px;
+  color: #e9bf8a;
+  font-size: 0.8rem;
+}
+.tension-gauge {
+  position: relative;
+  height: 38px;
+  background: linear-gradient(90deg, #70453b, #2f4c45, #70453b);
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 18px 0;
+}
+.tension-gauge .safe-band {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #81b89599;
+  border-inline: 2px solid #c4e4ab;
+}
+.tension-gauge i {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: #ffefcd;
+  box-shadow: 0 0 10px #ffe6a4;
+  transform: translateX(-2px);
+}
+.precision-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  line-height: 1.8;
+  margin: 10px 0;
+}
+.action-scene input[type="range"] {
+  width: 100%;
+  accent-color: #f2b475;
+  min-height: 32px;
+  margin: 10px 0;
+}
+.action-scene .primary {
+  margin-top: 10px;
+}
+.signal-dial {
+  height: 130px;
+  width: 130px;
+  border: 1px solid #8abeab77;
+  border-radius: 50%;
+  margin: 16px auto;
+  position: relative;
+  background: radial-gradient(#22483e, #142b30);
+}
+.signal-dial i {
+  position: absolute;
+  top: 8px;
+  left: 63px;
+  height: 56px;
+  width: 3px;
+  background: #edb36e;
+  transform-origin: bottom;
+  transform: rotate(var(--bearing));
+}
+.signal-dial strong {
+  position: absolute;
+  inset: 45px 0;
+  text-align: center;
+  color: #dbe5cc;
+  font-size: 1.4rem;
+}
+.signal-dial small {
+  display: block;
+  font-size: 0.65rem;
+  color: #9ab5a2;
+}
+.carry-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 17px 0;
+}
+.carry-lanes button {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 17px 8px;
+  background: #233b38;
+}
+.carry-lanes span {
+  font-size: 0.75rem;
+  color: #c3cbb2;
+  line-height: 1.6;
+}
+.disaster-result {
+  padding: 26px 30px;
+}
+.disaster-result .rescue-illustration {
+  max-height: 180px;
+}
+.disaster-result h2 {
+  margin: 12px 0;
+}
+.disaster-result blockquote {
+  font-size: 0.86rem;
+  line-height: 1.9;
+  color: #bdcdbb;
+  margin: 15px 0;
+}
+.disaster-result p {
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+.disaster-result .result-stats {
+  padding: 14px 0;
+  margin: 15px 0;
+  gap: 12px;
+}
+.disaster-result .button-row {
+  margin-top: 20px;
+}
+.disaster-result details {
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+@keyframes field-reveal {
+  from {
+    opacity: 0.4;
+    filter: brightness(0.7);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+@keyframes rocks-fall {
+  from {
+    opacity: 0;
+    translate: 0 -65px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes rock-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20% {
+    translate: -3px 2px;
+  }
+  40% {
+    translate: 3px -1px;
+  }
+  65% {
+    translate: -2px 0;
+  }
+}
+@keyframes water-rush {
+  to {
+    stroke-dashoffset: -108;
+  }
+}
+@keyframes heli-arrival {
+  from {
+    opacity: 0;
+    translate: -180px -45px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes rope-sway {
+  50% {
+    rotate: 2deg;
+  }
+}
+@keyframes tree-wind {
+  50% {
+    transform: skewX(1deg);
+  }
+}
+@media (max-width: 1100px) {
+  .disaster-operation {
+    padding: 20px;
+  }
+  .disaster-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  .disaster-hud {
+    gap: 18px;
+  }
+  .disaster-heading {
+    align-items: start;
+  }
+  .disaster-hud b {
+    font-size: 1.2rem;
+  }
+  .disaster-heading h1 {
+    font-size: 1.5rem;
+  }
+}
+@media (max-width: 800px) {
+  .disaster-heading {
+    display: block;
+  }
+  .disaster-hud {
+    margin-top: 20px;
+    gap: 12px;
+  }
+  .disaster-layout {
+    display: block;
+  }
+  .disaster-map-column {
+    position: static;
+  }
+  .disaster-sidebar {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .disaster-map-column .map-wrap {
+    height: 450px;
+  }
+  .disaster-forecast small {
+    margin-left: 0;
+  }
+}
+@media (max-width: 540px) {
+  .disaster-operation {
+    padding: 14px 12px;
+  }
+  .disaster-settings {
+    gap: 5px;
+  }
+  .disaster-settings button {
+    padding: 7px;
+    font-size: 0.65rem;
+  }
+  .disaster-forecast {
+    gap: 8px;
+    padding: 12px;
+  }
+  .disaster-forecast span {
+    font-size: 0.73rem;
+  }
+  .disaster-forecast small {
+    width: 100%;
+  }
+  .disaster-objective {
+    gap: 8px;
+  }
+  .disaster-objective strong {
+    font-size: 0.86rem;
+  }
+  .disaster-sidebar {
+    display: flex;
+  }
+  .disaster-movement {
+    padding: 12px;
+  }
+  .disaster-movement label {
+    display: block;
+  }
+  .disaster-movement select {
+    width: 100%;
+    margin-top: 8px;
+  }
+  .disaster-controls {
+    gap: 5px;
+  }
+  .disaster-controls button {
+    font-size: 0.73rem;
+  }
+  .disaster-controls small {
+    font-size: 0.62rem;
+  }
+  .disaster-app .modal-backdrop {
+    padding: 12px;
+  }
+  .disaster-app .modal {
+    padding: 20px;
+    max-height: calc(100svh - 24px);
+  }
+  .disaster-app .modal h2 {
+    font-size: 1.35rem;
+  }
+  .action-scene .rescue-illustration {
+    max-height: 145px;
+  }
+  .carry-lanes {
+    gap: 5px;
+  }
+  .carry-lanes button {
+    font-size: 0.75rem;
+    padding: 14px 5px;
+  }
+  .disaster-app .brandbar {
+    padding: 14px 12px;
+  }
+  .disaster-app .brand b {
+    font-size: 0.85rem;
+  }
+  .disaster-hud b {
+    font-size: 1.15rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .disaster-app * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+html[data-motion="off"] .disaster-app *,
+.disaster-app.motion-off * {
+  animation: none !important;
+  transition: none !important;
 }
