@@ -1,8 +1,8 @@
 export type Weather =
   "clear" | "cloudy" | "fog" | "drizzle" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
-export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
-export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export type CasualtyType = "lost" | "injured" | "cold";
 export const casualtyInfo = {
   lost: { name: "길을 잃은 등산객", detail: "기본 동행 비용 · 정보 수색 중심" },
@@ -71,6 +71,17 @@ export const weatherInfo: Record<
   snow: { name: "폭설", icon: "❄", detail: "−4°C · 이동 시간 ×1.3" },
 };
 export const missions = {
+  10: {
+    name: "최후의 구조 작전",
+    subtitle:
+      "정상에 오르는 것이 목표가 아니다. 모두 살아 돌아오는 것이 목표다.",
+    limit: 460,
+    start: 15 * 60 + 10,
+    sunset: 140,
+    difficulty: "통합 구조",
+    description:
+      "15:10, 백운산 동쪽 암릉에서 김하늘 씨가 실종됐습니다. 입구의 장갑과 발자국을 조사하고 전망대에서 신호를 분석하세요. 약 한 시간 뒤 비구름과 돌풍이 접근합니다. 낙석 우회, 절벽 인양과 처치 후 지상 귀환·H 지점 항공 지원·대피소 대기를 선택하십시오. 구조 후에는 현지 폭풍 예보가 갱신됩니다.",
+  },
   9: {
     name: "하늘에서 온 구조 요청",
     subtitle: "하늘이 열리는 순간, 구조의 희망이 시작된다.",
@@ -165,6 +176,7 @@ export const missions = {
 export const missionType = (id: MissionId): CasualtyType =>
   id === 4 ? "injured" : id === 5 ? "cold" : "lost";
 export const recommendations: Record<MissionId, Equipment[]> = {
+  10: ["rope", "kit", "blanket"],
   9: ["rope", "kit", "blanket"],
   8: ["rope", "kit", "blanket"],
   7: ["rope", "kit", "blanket"],
@@ -176,6 +188,7 @@ export const recommendations: Record<MissionId, Equipment[]> = {
   5: ["lantern", "blanket", "kit"],
 };
 export const evaluationRules: Record<MissionId, string> = {
+  10: "조난자와 대원 모두 귀환해야 성공. 생존 60 이상·제한 시간85% 이내 3별. 정밀 로프 구조는 성공 귀환 시 추가 보상. 지상·항공 동등 평가.",
   9: "지상·항공 동일 평가: 생존 60 이상·제한 시간85% 이내 3별, 생존35 이상2별. 조난자와 구조팀 모두 안전해야 성공.",
   8: "안전 귀환·생존·시간으로 별 평가. 정밀 수동 구조는 성공 귀환 시 경험치 +20, 안정 구조 +10. 자동 구조도 정상 완료.",
   7: "3별: 안전 인계·생존 60 이상·제한 시간 85% 이내 / 2별: 생존 35 이상 · 자동 구조도 같은 평가",

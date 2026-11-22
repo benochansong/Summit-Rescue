@@ -215,12 +215,24 @@ export default function RescueActionPanel({
       </span>
       <h2 id="action-title">{title}</h2>
       <RescueIllustration scene={session.kind} />
+      {game.mission === 10 && session.kind === "signal" && (
+        <p>
+          정확한 수동 분석: 후보 1곳·기본 8분. 자동 분석: 후보 최대 2곳·16분.
+          수동 실패 3회: 부분 정보·20분.
+        </p>
+      )}
       <div className="action-progress" aria-live="polite">
         진행{" "}
-        {game.mission === 8 && session.kind === "signal"
+        {(game.mission === 8 || game.mission === 10) &&
+        session.kind === "signal"
           ? (session.steady ?? 0)
           : session.round}{" "}
-        / {game.mission === 8 && session.kind === "signal" ? 2 : 3} ·{" "}
+        /{" "}
+        {(game.mission === 8 || game.mission === 10) &&
+        session.kind === "signal"
+          ? 2
+          : 3}{" "}
+        ·{" "}
         {session.mistakes
           ? `실수 ${session.mistakes}회 · 추가 비용으로 계속 진행합니다`
           : "안전하게 진행 중"}
@@ -282,7 +294,7 @@ export default function RescueActionPanel({
           <p>
             방향을 돌려 신호가 가장 선명해지는 곳을 찾으세요. 0° 북쪽 · 90° 동쪽
             · 180° 남쪽 · 270° 서쪽.{" "}
-            {game.mission === 8
+            {game.mission === 8 || game.mission === 10
               ? "강한 신호를 2회 연속 확인하세요. 실패하면 연속 포착이 초기화됩니다."
               : "세 번 분석하면 지원팀이 교차 확인합니다."}
           </p>
