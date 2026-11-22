@@ -1,3 +1,4 @@
+import { finalSchedule } from "./finalMission";
 import type { Weather } from "./conditions";
 import type { Difficulty } from "./experience";
 export const disasterCandidates = ["cave", "ridge", "east"];
@@ -148,6 +149,7 @@ export function disasterSchedule(
   seed: number,
   mission = 7,
 ): { at: number; weather: Weather }[] {
+  if (mission === 10) return finalSchedule(difficulty, seed);
   if (mission === 9)
     return [
       { at: 0, weather: "clear" },

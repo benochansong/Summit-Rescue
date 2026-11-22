@@ -100,6 +100,7 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
     "7": emptyStats(),
     "8": emptyStats(),
     "9": emptyStats(),
+    "10": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -394,6 +395,12 @@ function restoreBests(
     }
   for (const r of records) bests = improveBest(bests, r);
   return bests;
+}
+export function readPersonalBest(
+  mission: number,
+  difficulty?: Difficulty,
+): PersonalBest | undefined {
+  return readStore().bests[recordKey({ mission, difficulty })];
 }
 export function personalHighlights(
   g: Pick<

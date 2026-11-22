@@ -383,7 +383,8 @@ export default function CliffRescue({
           {s.stage === "approach" && (
             <>
               <blockquote>
-                “서윤 씨, 이제 함께 올라갑니다. 손을 놓지 마세요.”
+                “{game.mission === 10 ? "하늘" : "서윤"} 씨, 이제 함께
+                올라갑니다. 손을 놓지 마세요.”
                 <br />
                 “네, 기다리고 있었어요.”
               </blockquote>

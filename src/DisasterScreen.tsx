@@ -1,3 +1,4 @@
+import { finalAct, finalPattern, finalLimit } from "./finalMission";
 import HelicopterPanel from "./HelicopterPanel";
 import HelicopterScene from "./HelicopterScene";
 import { airActive, airEta, skyLanding, airNames } from "./helicopter";
@@ -7,14 +8,16 @@ import MountainMap from "./Map";
 import RescueActionPanel, { RescueIllustration } from "./RescueAction";
 import {
   disasterProfiles,
-  disasterSchedule,
-  disasterTimes,
   disasterVisibility,
   landingSites,
   scenes,
 } from "./disasterData";
 import {
   allRoutesSafe,
+  disasterForecast,
+  disasterLimit,
+  worldTimes,
+  rockEdge,
   createDisaster,
   disasterCost,
   disasterDisabled,
@@ -32,7 +35,13 @@ import {
 } from "./disaster";
 import { adjacent, point, regionFor } from "./regions";
 import { equipment, weatherInfo, missions } from "./conditions";
-import { personalHighlights, saveRecord, type Settings } from "./storage";
+import {
+  personalHighlights,
+  readPersonalBest,
+  saveRecord,
+  type Settings,
+  type PersonalBest,
+} from "./storage";
 import { RescueAudio } from "./audio";
 import type { Difficulty } from "./experience";
 export function DisasterSetup({
@@ -40,7 +49,7 @@ export function DisasterSetup({
   onChange,
   mission = 7,
 }: {
-  mission?: 7 | 8 | 9;
+  mission?: 7 | 8 | 9 | 10;
   value: Difficulty;
   onChange: (d: Difficulty) => void;
 }) {
@@ -61,7 +70,7 @@ export function DisasterSetup({
             />
             <strong>{disasterProfiles[id].name}</strong>
             <small>
-              {disasterProfiles[id].limit}분 ·{" "}
+              {mission === 10 ? finalLimit(id) : disasterProfiles[id].limit}분 ·{" "}
               {mission === 9
                 ? "항공 지원 1회 · 지상 귀환 필수"
                 : `로프 안전 폭 ${disasterProfiles[id].window}%`}
@@ -103,6 +112,7 @@ export default function DisasterScreen({
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [highlights, setHighlights] = useState<string[]>([]),
+    [best, setBest] = useState<PersonalBest | undefined>(undefined),
     [aborting, setAborting] = useState(false);
   const lock = useRef(false),
     timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
@@ -110,10 +120,8 @@ export default function DisasterScreen({
     dialogRef = useRef<HTMLDivElement>(null);
   const weather = disasterWeather(game),
     profile = disasterProfiles[game.difficulty],
-    forecast = disasterSchedule(game.difficulty, game.seed, game.mission).find(
-      (p) => p.at > game.elapsed,
-    ),
-    times = disasterTimes(game.difficulty, game.seed);
+    forecast = disasterForecast(game).find((p) => p.at > game.elapsed),
+    times = worldTimes(game);
   const scene = game.scenes[0],
     modal =
       !!scene ||
@@ -265,6 +273,8 @@ export default function DisasterScreen({
           "기록을 저장하지 못했습니다. 브라우저 저장 공간과 설정을 확인하세요.",
         );
     }
+    if (next.status !== "active")
+      setBest(readPersonalBest(next.mission, next.difficulty));
     timer.current = setTimeout(
       () => {
         lock.current = false;
@@ -287,11 +297,12 @@ export default function DisasterScreen({
       initial.equipment,
       initial.skills,
       initial.practice,
-      initial.mission as 7 | 8 | 9,
+      initial.mission as 7 | 8 | 9 | 10,
     );
     setGame(settings.skipDialogue ? { ...next, scenes: [] } : next);
     setSelected("gate");
     setHighlights([]);
+    setBest(undefined);
     setNotice("");
     setAborting(false);
   }
@@ -319,9 +330,11 @@ export default function DisasterScreen({
       game.position,
       game.found
         ? "base"
-        : game.possible.length === 1
-          ? game.possible[0]
-          : "lookout",
+        : game.mission === 10 && !game.clues.length && !game.analyzed
+          ? "gate"
+          : game.possible.length === 1 || game.analyzed
+            ? game.possible[0]
+            : "lookout",
     );
   const blocked =
     adjacent(game.position, 7).includes(selected) &&
@@ -379,7 +392,8 @@ export default function DisasterScreen({
               </b>
             </span>
             <span>
-              남은 시간<b>{Math.max(0, profile.limit - game.elapsed)}분</b>
+              남은 시간
+              <b>{Math.max(0, disasterLimit(game) - game.elapsed)}분</b>
             </span>
             <span>
               대원 체력<b>{game.stamina}</b>
@@ -407,6 +421,32 @@ export default function DisasterScreen({
           </span>
           <small>결정 중에는 시간이 흐르지 않습니다.</small>
         </div>
+        {game.mission === 10 && (
+          <section className="final-act" aria-label="임무 진행 단계">
+            <div>
+              <span className="eyebrow orange">
+                ACT {finalAct(game).number} / 6 · {finalPattern(game.seed).name}
+              </span>
+              <strong>{finalAct(game).title}</strong>
+              <p>{finalAct(game).hint}</p>
+            </div>
+            <ol>
+              {["흔적", "산사태", "신호", "절벽", "귀환", "완료"].map(
+                (name, i) => (
+                  <li
+                    key={name}
+                    aria-current={
+                      finalAct(game).number === i + 1 ? "step" : undefined
+                    }
+                  >
+                    <b>{i + 1}</b>
+                    {name}
+                  </li>
+                ),
+              )}
+            </ol>
+          </section>
+        )}
         <div className="disaster-objective">
           <span className="eyebrow orange">현재 목표</span>
           <strong>{objective}</strong>
@@ -435,7 +475,7 @@ export default function DisasterScreen({
                 ),
                 route: route ?? [],
                 cost: (to) => disasterCost(game, { type: "move", to }),
-                landingPoints: game.mission === 9 ? skyLanding : undefined,
+                landingPoints: game.mission >= 9 ? skyLanding : undefined,
                 helicopter:
                   game.air && airActive(game.air)
                     ? {
@@ -522,9 +562,13 @@ export default function DisasterScreen({
               <p>
                 낙석:{" "}
                 {game.events.includes("rock")
-                  ? edgeState(game, "fork", "cave") === "blocked"
-                    ? "삼거리–바위 그늘 차단"
-                    : "삼거리–바위 그늘 통행 확보"
+                  ? edgeState(game, ...rockEdge(game)) === "blocked"
+                    ? rockEdge(game)
+                        .map((id) => point(id, 7).name)
+                        .join("–") + " 차단"
+                    : rockEdge(game)
+                        .map((id) => point(id, 7).name)
+                        .join("–") + " 통행 확보"
                   : `+${times.rock}분 예상 · 사전 경고 +${times.rockWarning}분`}
               </p>
               <p>
@@ -549,11 +593,13 @@ export default function DisasterScreen({
             <section className="panel field-actions">
               <span className="eyebrow orange">
                 구조 1팀 ·{" "}
-                {game.mission === 9
-                  ? "박도현"
-                  : game.mission === 8
-                    ? "한서윤"
-                    : "이재하"}{" "}
+                {game.mission === 10
+                  ? "김하늘"
+                  : game.mission === 9
+                    ? "박도현"
+                    : game.mission === 8
+                      ? "한서윤"
+                      : "이재하"}{" "}
                 씨 수색
               </span>
               <h2>
@@ -572,7 +618,7 @@ export default function DisasterScreen({
                 {control({ type: "start", kind: "signal" }, "신호 탐지")}
                 {game.mission === 9
                   ? null
-                  : game.mission === 8
+                  : game.mission === 8 || game.mission === 10
                     ? game.cliff &&
                       control(
                         { type: "cliff", command: { type: "resume" } },
@@ -589,6 +635,26 @@ export default function DisasterScreen({
               </div>
               <small>현장 액션은 조작 완료 시 비용 반영. 자동 지원 가능.</small>
             </section>
+            {game.mission === 10 && game.secured && (
+              <section className="panel shelter-panel">
+                <span className="eyebrow orange">마지막 귀환 판단</span>
+                <h2>서두를 때와 기다릴 때</h2>
+                <p>
+                  지상 귀환은 동행 이동 부담이 있습니다. 항공은 기상·H 지점·준비
+                  시간이 필요하며 대원은 따로 귀환합니다.
+                </p>
+                <p>
+                  바위 그늘 · 백운 대피소: 처치 후 보호 대기 15분 / 체력 +20 /
+                  대기 중 상태 악화 75% 완화. 기다리는 동안에도 조난자 상태는
+                  감소합니다.
+                </p>
+                {control({ type: "shelter" }, "대피소 보호 대기")}
+                <small>
+                  현재 기상: {weatherInfo[weather].name} · 보호 대기{" "}
+                  {game.shelterStops ?? 0}회
+                </small>
+              </section>
+            )}
             {game.air ? (
               <HelicopterPanel game={game} act={act} busy={busy || modal} />
             ) : (
@@ -666,11 +732,13 @@ export default function DisasterScreen({
               {game.status === "success" ? (
                 <blockquote>
                   “그 목소리를 듣고 버틸 수 있었어요.”{" "}
-                  {game.mission === 9
-                    ? "도현"
-                    : game.mission === 8
-                      ? "서윤"
-                      : "재하"}{" "}
+                  {game.mission === 10
+                    ? "하늘"
+                    : game.mission === 9
+                      ? "도현"
+                      : game.mission === 8
+                        ? "서윤"
+                        : "재하"}{" "}
                   씨가 구조대에 고개를 숙입니다.
                 </blockquote>
               ) : (
@@ -685,6 +753,12 @@ export default function DisasterScreen({
                   <strong key={s}>{s}</strong>
                 ))}
               </div>
+              {best && (
+                <p>
+                  같은 난이도 개인 최고: {best.time}분 · 생존 {best.health} ·{" "}
+                  {"★".repeat(best.stars)}
+                </p>
+              )}
               <div className="result-stats">
                 <div>
                   <small>소요 시간</small>
@@ -730,6 +804,14 @@ export default function DisasterScreen({
                   {game.cliffResult.mistakes}회 · {game.cliffResult.time}분 /
                   체력 {game.cliffResult.energy} · 안전 귀환 보너스{" "}
                   {game.status === "success" ? game.cliffResult.bonus : 0}
+                </p>
+              )}
+              {game.mission === 10 && (
+                <p>
+                  작전 패턴: {finalPattern(game.seed).name} · 대피소 보호 대기{" "}
+                  {game.shelterStops ?? 0}회 · 로프 인양{" "}
+                  {game.cliffResult ? "완료" : "미완료"} · 구조팀{" "}
+                  {game.position === "base" ? "본부 복귀" : "귀환 미완료"}
                 </p>
               )}
               <p>
@@ -818,26 +900,41 @@ export default function DisasterScreen({
               aria-labelledby="scene-title"
             >
               <span className="eyebrow orange">
-                {game.mission === 9 && scene === "dispatch"
-                  ? "16:20 · 고산 능선 구조 신고"
-                  : game.mission === 8 && scene === "dispatch"
-                    ? "15:30 · 백운산 동쪽 암릉"
-                    : scenes[scene].eyebrow}
+                {game.mission === 10 && scene === "dispatch"
+                  ? "15:10 · 백운산 최후의 구조 작전"
+                  : game.mission === 9 && scene === "dispatch"
+                    ? "16:20 · 고산 능선 구조 신고"
+                    : game.mission === 8 && scene === "dispatch"
+                      ? "15:30 · 백운산 동쪽 암릉"
+                      : scenes[scene].eyebrow}
               </span>
               <h2 id="scene-title">{scenes[scene].title}</h2>
               <RescueIllustration scene={scene} />
               <p>
-                {game.mission === 9 && scene === "dispatch"
-                  ? missions[9].description
-                  : game.mission === 9 && scene === "found"
-                    ? "도현 씨를 발견했습니다. 기본 응급처치 후 지상 동행 또는 H 지점 항공 지원을 선택하세요. 항공 이송 후에도 구조팀 귀환이 필요합니다."
-                    : game.mission === 8 && scene === "dispatch"
-                      ? missions[8].description
-                      : game.mission === 8 && scene === "found"
-                        ? "절벽 아래 서윤 씨를 발견했습니다. 장비를 확인하고 로프를 안정시킨 뒤 하강하세요. 안전 인양 전까지 이동할 수 없습니다."
-                        : game.mission === 8 && scene === "secured"
-                          ? "서윤 씨를 안전 지형으로 인양했습니다. 기본 처치 후 본부로 함께 귀환하세요."
-                          : scenes[scene].text}
+                {game.mission === 10
+                  ? scene === "dispatch"
+                    ? missions[10].description
+                    : scene === "found"
+                      ? "절벽 아래 하늘 씨를 찾았습니다. 장력 안정화, 하강, 접근과 인양을 진행하세요. 안전 지형으로 올리기 전에는 이동할 수 없습니다."
+                      : scene === "secured"
+                        ? "하늘 씨를 안전 지형으로 인양했습니다. 기상이 급변했습니다. 응급처치 후 지상 귀환·항공 지원·대피소 대기를 비교하세요."
+                        : scene === "rock"
+                          ? rockEdge(game)
+                              .map((id) => point(id, 7).name)
+                              .join("–") +
+                            " 등산로가 실제로 통제됐습니다. 지도의 우회 경로 또는 경로 확보 비용을 확인하세요."
+                          : scenes[scene].text
+                  : game.mission === 9 && scene === "dispatch"
+                    ? missions[9].description
+                    : game.mission === 9 && scene === "found"
+                      ? "도현 씨를 발견했습니다. 기본 응급처치 후 지상 동행 또는 H 지점 항공 지원을 선택하세요. 항공 이송 후에도 구조팀 귀환이 필요합니다."
+                      : game.mission === 8 && scene === "dispatch"
+                        ? missions[8].description
+                        : game.mission === 8 && scene === "found"
+                          ? "절벽 아래 서윤 씨를 발견했습니다. 장비를 확인하고 로프를 안정시킨 뒤 하강하세요. 안전 인양 전까지 이동할 수 없습니다."
+                          : game.mission === 8 && scene === "secured"
+                            ? "서윤 씨를 안전 지형으로 인양했습니다. 기본 처치 후 본부로 함께 귀환하세요."
+                            : scenes[scene].text}
               </p>
               <small>
                 현지 시각은 멈춰 있습니다. 지도를 확인한 뒤 결정하세요.
