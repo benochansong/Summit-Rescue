@@ -1,7 +1,15 @@
+import {
+  beginCliff,
+  cliffStep,
+  cliffResult,
+  type CliffSession,
+  type CliffCommand,
+  type CliffResult,
+} from "./rescueActions";
 import { createGame, type Game, type Cost } from "./game";
 import { adjacent, connection, point, regionFor } from "./regions";
 import { decayHealth } from "./casualties";
-import { weatherInfo, type Equipment } from "./conditions";
+import { weatherInfo, missions, type Equipment } from "./conditions";
 import type { SkillLevels } from "./progression";
 import type { Difficulty } from "./experience";
 import {
@@ -18,6 +26,7 @@ export type ActionSession = {
   round: number;
   mistakes: number;
   careful: number;
+  steady?: number;
 };
 export type DisasterGame = Game & {
   difficulty: Difficulty;
@@ -34,8 +43,11 @@ export type DisasterGame = Game & {
   evacuated: boolean;
   detours: number;
   crossings: number;
+  cliff?: CliffSession;
+  cliffResult?: CliffResult;
 };
 export type DisasterAction =
+  | { type: "cliff"; command: CliffCommand }
   | { type: "move"; to: string }
   | {
       type:
@@ -62,8 +74,9 @@ export function createDisaster(
   items: Equipment[] = ["rope", "kit", "blanket"],
   skills?: SkillLevels,
   practice = false,
+  mission: 7 | 8 = 7,
 ): DisasterGame {
-  const g = createGame(seed, 7, items, skills, practice);
+  const g = createGame(seed, mission, items, skills, practice);
   return {
     ...g,
     target: disasterCandidates[g.seed % 3],
@@ -86,7 +99,9 @@ export function createDisaster(
     detours: 0,
     crossings: 0,
     log: [
-      "이재하 · 34세 · 북쪽 암릉에서 다리 부상. 제2전망대에서 신호 방향을 분석하십시오.",
+      mission === 8
+        ? "한서윤 · 29세 · 동쪽 암릉 절벽 아래 고립. 제2전망대에서 무전 신호를 포착하십시오."
+        : "이재하 · 34세 · 북쪽 암릉에서 다리 부상. 제2전망대에서 신호 방향을 분석하십시오.",
     ],
   };
 }
@@ -193,7 +208,10 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
       time:
         Math.max(6, 12 - g.skills.search * 2) +
         (w === "fog" ? 5 : 0) +
-        (g.elapsed >= 190 && !g.equipment.includes("lantern") ? 10 : 0),
+        (g.elapsed >= missions[g.mission].sunset &&
+        !g.equipment.includes("lantern")
+          ? 10
+          : 0),
       energy: 6,
     };
   if (a.type === "rest") return { time: 15, energy: -25 };
@@ -225,6 +243,7 @@ export function disasterCost(g: DisasterGame, a: DisasterAction): Cost {
   return { time: 0, energy: 0 };
 }
 export function helicopterReason(g: DisasterGame) {
+  if (g.mission === 8) return "이 작전은 절벽 인양 후 지상 귀환을 진행합니다.";
   if (g.helicopter)
     return "헬기가 접근 중입니다. 현장에서 대기하거나 취소 없이 지상 귀환할 수 있습니다.";
   if (g.heliUses >= 2) return "지원 횟수 2회를 사용했습니다.";
@@ -242,6 +261,37 @@ export function disasterDisabled(g: DisasterGame, a: DisasterAction): string {
   if (a.type === "abandon") return "";
   if (g.scenes.length)
     return "상황 화면을 확인하세요. 게임 시간은 멈춰 있습니다.";
+  if (a.type === "cliff") {
+    if (!g.cliff || g.secured) return "진행 중인 절벽 구조가 없습니다.";
+    const c = a.command;
+    if (c.type === "auto" || c.type === "finish") {
+      if (
+        !g.cliff.visible ||
+        g.cliff.paused ||
+        (c.type === "finish" && g.cliff.stage !== "hoist")
+      )
+        return "해당 구조 단계를 먼저 완료하세요.";
+      if (
+        g.stamina <
+        cliffResult(g.cliff, c.type === "auto", g.equipment.includes("rope"))
+          .energy
+      )
+        return "체력이 부족합니다. 지도로 복귀해 휴식하세요.";
+      return "";
+    }
+    return cliffStep(
+      g.cliff,
+      c,
+      g.difficulty,
+      disasterWeather(g),
+      g.equipment.includes("rope"),
+    ) === g.cliff
+      ? "현재 단계에서는 사용할 수 없는 조작입니다."
+      : "";
+  }
+  if (g.cliff?.visible) return "절벽 구조를 완료하거나 지도로 잠시 복귀하세요.";
+  if (g.mission === 8 && a.type === "start" && a.kind !== "signal")
+    return "절벽 구조 계속을 선택하세요. 인양하면 안전 지형으로 이송됩니다.";
   if (g.action && !["auto", "signal", "rope", "carry"].includes(a.type))
     return "현장 구조를 완료하거나 자동 구조로 전환하세요.";
   if (!g.action && ["auto", "signal", "rope", "carry"].includes(a.type))
@@ -340,7 +390,7 @@ function spend(g: DisasterGame, c: Cost): DisasterGame {
       health,
       0.13 + g.injury,
       disasterWeather(g, g.elapsed + i),
-      g.elapsed + i >= 190,
+      g.elapsed + i >= missions[g.mission].sunset,
       g.insulated,
       false,
       1 - disasterProfiles[g.difficulty].decay,
@@ -526,6 +576,43 @@ export function disasterTransition(
       action: null,
       helicopter: null,
     };
+  if (a.type === "cliff") {
+    if (a.command.type === "auto" || a.command.type === "finish") {
+      const result = cliffResult(
+        g.cliff!,
+        a.command.type === "auto",
+        g.equipment.includes("rope"),
+      );
+      n = spend(n, result);
+      n.cliff = undefined;
+      n.cliffResult = result;
+      n.secured = true;
+      n.carried = true;
+      n.scenes.push("secured");
+      n.routeReport = [
+        ...n.routeReport,
+        "절벽 " +
+          result.grade +
+          ": " +
+          result.time +
+          "분 / 체력 " +
+          result.energy +
+          " · 실수 " +
+          result.mistakes +
+          " · 귀환 보너스 " +
+          result.bonus,
+      ];
+      return updateWorld(n);
+    }
+    n.cliff = cliffStep(
+      g.cliff!,
+      a.command,
+      g.difficulty,
+      disasterWeather(g),
+      g.equipment.includes("rope"),
+    );
+    return n;
+  }
   if (a.type === "start") {
     n.action = { kind: a.kind, round: 0, mistakes: 0, careful: 0 };
     return n;
@@ -543,7 +630,11 @@ export function disasterTransition(
       signalPower(g, a.angle) >=
       (g.difficulty === "hard" ? 85 : g.difficulty === "easy" ? 65 : 75);
     if (!ok) n.action!.mistakes++;
-    if (ok || n.action!.round === 3) n = finishAction(n, false);
+    if (g.mission === 8) {
+      n.action!.steady = ok ? (n.action!.steady ?? 0) + 1 : 0;
+      n.action!.mistakes = Math.min(3, n.action!.mistakes);
+      if (n.action!.steady === 2) n = finishAction(n, false);
+    } else if (ok || n.action!.round === 3) n = finishAction(n, false);
   } else if (a.type === "carry") {
     const terrain = carryTerrain(g),
       bad =
@@ -609,6 +700,7 @@ export function disasterTransition(
       n.searched = [...g.searched, g.position];
       if (g.position === g.target) {
         n.found = true;
+        if (g.mission === 8) n.cliff = beginCliff();
         n.scenes.push("found");
       } else if (["gate", "lookout"].includes(g.position))
         n.clues = [
@@ -674,7 +766,9 @@ export const disasterRating = (g: DisasterGame) =>
         ? 2
         : 1;
 export const disasterXp = (g: DisasterGame) =>
-  g.status === "success" && !g.practice ? 100 + disasterRating(g) * 25 : 0;
+  g.status === "success" && !g.practice
+    ? 100 + disasterRating(g) * 25 + (g.cliffResult?.bonus ?? 0)
+    : 0;
 export function disasterGoal(g: DisasterGame) {
   if (!g.found)
     return g.possible.length === 1
@@ -683,7 +777,9 @@ export function disasterGoal(g: DisasterGame) {
   if (!g.secured) return "로프 구조로 조난자에게 접근";
   if (!g.treated) return "기본 응급처치로 상태 안정화";
   if (!g.carried) return "부상자 이송으로 안전 지형 확보";
-  return "본부로 지상 귀환 또는 H 지점에서 항공 지원";
+  return g.mission === 8
+    ? "조난자와 함께 구조본부로 지상 귀환"
+    : "본부로 지상 귀환 또는 H 지점에서 항공 지원";
 }
 export function allRoutesSafe(g: DisasterGame) {
   return regionFor(7).points.every((p) => safeRoute(g, p.id, "base") !== null);

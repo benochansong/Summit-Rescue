@@ -63,7 +63,7 @@ export default function MountainMap({
     points = region.points,
     edges = region.edges;
   const night =
-    (game.mission === 5 || game.mission === 7) &&
+    (game.mission === 5 || game.mission >= 7) &&
     game.elapsed >= missions[game.mission].sunset;
   const routeState = (a: string, b: string) =>
     tactical?.states[[a, b].sort().join("~")] ?? "open";
@@ -126,7 +126,7 @@ export default function MountainMap({
   const here = mapPoint(marker.id);
   return (
     <div
-      className={`map-wrap region-${region.theme} weather-${weather} ${night ? "is-night" : ""} ${game.mission === 7 && game.elapsed >= 150 && game.elapsed < 190 ? "is-sunset" : ""}`}
+      className={`map-wrap region-${region.theme} weather-${weather} ${night ? "is-night" : ""} ${game.mission >= 7 && game.elapsed >= 150 && game.elapsed < 190 ? "is-sunset" : ""}`}
     >
       <div className="map-heading">
         <span className="eyebrow">작전 구역 · {region.name}</span>
@@ -604,7 +604,7 @@ export default function MountainMap({
               </g>
             );
           })()}
-        {game.mission === 7 &&
+        {game.mission >= 7 &&
           ["lookout", "hut", "pine"].map((id) => {
             const p = mapPoint(id);
             return (

@@ -1,8 +1,8 @@
 export type Weather =
   "clear" | "cloudy" | "fog" | "drizzle" | "rain" | "wind" | "snow";
 export type Equipment = "kit" | "blanket" | "rope" | "lantern" | "drone";
-export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
-export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7];
+export type MissionId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export const missionIds: MissionId[] = [1, 2, 3, 4, 5, 6, 7, 8];
 export type CasualtyType = "lost" | "injured" | "cold";
 export const casualtyInfo = {
   lost: { name: "길을 잃은 등산객", detail: "기본 동행 비용 · 정보 수색 중심" },
@@ -71,6 +71,16 @@ export const weatherInfo: Record<
   snow: { name: "폭설", icon: "❄", detail: "−4°C · 이동 시간 ×1.3" },
 };
 export const missions = {
+  8: {
+    name: "절벽 아래의 구조 신호",
+    subtitle: "산은 위험하다. 하지만 구조는 멈추지 않는다.",
+    limit: 400,
+    start: 15 * 60 + 30,
+    sunset: 110,
+    difficulty: "절벽 구조",
+    description:
+      "오후 3시 30분, 백운산 동쪽 암릉에서 한서윤 씨가 절벽 아래 고립됐습니다. 제2전망대에서 흔적과 무전 방향을 조사하고 현장을 수색하세요. 로프 안정화·하강·인양 후 처치하고 본부까지 함께 귀환하십시오.",
+  },
   7: {
     name: "폭풍 속 마지막 구조",
     subtitle: "산이 변하면, 구조 작전도 변해야 한다",
@@ -145,6 +155,7 @@ export const missions = {
 export const missionType = (id: MissionId): CasualtyType =>
   id === 4 ? "injured" : id === 5 ? "cold" : "lost";
 export const recommendations: Record<MissionId, Equipment[]> = {
+  8: ["rope", "kit", "blanket"],
   7: ["rope", "kit", "blanket"],
   6: ["drone", "kit", "rope"],
   1: ["kit", "blanket", "rope"],
@@ -154,6 +165,7 @@ export const recommendations: Record<MissionId, Equipment[]> = {
   5: ["lantern", "blanket", "kit"],
 };
 export const evaluationRules: Record<MissionId, string> = {
+  8: "안전 귀환·생존·시간으로 별 평가. 정밀 수동 구조는 성공 귀환 시 경험치 +20, 안정 구조 +10. 자동 구조도 정상 완료.",
   7: "3별: 안전 인계·생존 60 이상·제한 시간 85% 이내 / 2별: 생존 35 이상 · 자동 구조도 같은 평가",
   6: "S: 2명 구조·대원 전원 안전·230분 이내·생존 50 이상 / A: 2명 구조·전원 안전 / B: 1명 구조 / C: 미달성",
   1: "3별: 생존 65 이상·162분 이내 / 2별: 생존 40 이상",
@@ -166,7 +178,7 @@ export const schedule = (
   mission: MissionId,
   seed = 0,
 ): { at: number; weather: Weather }[] =>
-  mission === 7
+  mission >= 7
     ? [
         { at: 0, weather: "clear" },
         { at: 30, weather: "cloudy" },

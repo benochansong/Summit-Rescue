@@ -92,6 +92,7 @@ function fromRecords(records: RecordEntry[]): Record<string, MissionStats> {
     "5": emptyStats(),
     "6": emptyStats(),
     "7": emptyStats(),
+    "8": emptyStats(),
   };
   for (const r of records) totals[r.mission] = addWin(totals[r.mission], r);
   return totals;
@@ -159,7 +160,7 @@ export function readRecords(): RecordEntry[] {
 export function saveRecord(
   game: Game,
   mission = game.mission,
-  details: { difficulty?: Difficulty; rating?: number } = {},
+  details: { difficulty?: Difficulty; rating?: number; bonus?: number } = {},
 ): boolean {
   if (game.status === "active") return false;
   if (game.practice) return true;
@@ -181,7 +182,7 @@ export function saveRecord(
         details.rating === undefined
           ? earnedXp(game)
           : game.status === "success"
-            ? 100 + details.rating * 25
+            ? 100 + details.rating * 25 + (details.bonus ?? 0)
             : 0,
       routes: game.routeReport,
       difficulty: details.difficulty ?? game.experience?.difficulty,
@@ -210,7 +211,7 @@ export function isUnlocked(mission: number): boolean {
   const totals = readStore().totals;
   return (
     mission === 1 ||
-    mission === 7 ||
+    mission >= 7 ||
     !!totals[mission]?.completed ||
     !!totals[mission - 1]?.completed
   );

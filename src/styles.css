@@ -3461,3 +3461,155 @@ html[data-motion="off"] .disaster-app *,
   animation: none !important;
   transition: none !important;
 }
+/* Phase 6-B: layered cliff stage, movement follows engine-owned progress. */
+.cliff-scene {
+  max-width: 850px;
+  width: min(94vw, 850px);
+  padding: 26px;
+  background: #142b32;
+}
+.cliff-hud,
+.cliff-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  margin: 12px 0;
+}
+.cliff-hud span {
+  padding: 7px 10px;
+  background: #223d42;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.cliff-art {
+  width: 100%;
+  max-height: 35vh;
+  border-radius: 10px;
+  display: block;
+  overflow: hidden;
+}
+.cliff-rescuer,
+.cliff-wall {
+  transition: transform 900ms ease-in-out;
+}
+.cliff-clouds {
+  animation: cliff-cloud 12s ease-in-out infinite alternate;
+}
+.cliff-stones {
+  animation: cliff-stone 3s ease-in infinite;
+}
+.cliff-signal {
+  animation: cliff-beacon 2s ease-in-out infinite;
+}
+.cliff-scene.weather-wind .cliff-rope {
+  animation: cliff-sway 1.5s ease-in-out infinite alternate;
+  transform-origin: 270px 72px;
+}
+.cliff-scene input[type="range"] {
+  width: 100%;
+  accent-color: #e9a160;
+  margin: 14px 0;
+}
+.cliff-toolbar button,
+.cliff-toolbar label {
+  font-size: 12px;
+  padding: 8px;
+}
+.cliff-feedback {
+  background: #203f43;
+  border-left: 3px solid #81c3aa;
+  padding: 10px;
+}
+.cliff-feedback.feedback-miss {
+  border-color: #ed976c;
+  color: #ffd0ae;
+}
+.cliff-shake:has(.feedback-miss) .cliff-art {
+  animation: cliff-shake 0.3s 1;
+}
+.gauge-legend {
+  font-size: 12px;
+  text-align: center;
+  margin: 9px 0;
+  color: #cfb9a2;
+}
+.caution-band {
+  position: absolute;
+  left: 16%;
+  width: 68%;
+  height: 100%;
+  background: #a48e49;
+  opacity: 0.5;
+}
+.cliff-static *,
+.cliff-paused * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+.cliff-static .cliff-stones {
+  opacity: 0.4;
+}
+@keyframes cliff-cloud {
+  to {
+    transform: translateX(35px);
+  }
+}
+@keyframes cliff-stone {
+  from {
+    transform: translateY(-25px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(60px);
+    opacity: 0;
+  }
+}
+@keyframes cliff-beacon {
+  50% {
+    opacity: 0.2;
+  }
+}
+@keyframes cliff-sway {
+  to {
+    transform: rotate(1deg);
+  }
+}
+@keyframes cliff-shake {
+  33% {
+    transform: translateX(-3px);
+  }
+  66% {
+    transform: translateX(3px);
+  }
+}
+@media (max-width: 600px) {
+  .cliff-scene {
+    padding: 18px;
+  }
+  .cliff-art {
+    max-height: 27vh;
+  }
+  .cliff-hud {
+    gap: 4px;
+  }
+  .cliff-hud span {
+    font-size: 11px;
+    padding: 5px;
+  }
+  .cliff-toolbar {
+    gap: 4px;
+  }
+  .cliff-scene h2 {
+    font-size: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cliff-scene * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
